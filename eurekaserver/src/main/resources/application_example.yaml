@@ -1,0 +1,21 @@
+server:
+  port: 8761
+
+spring:
+  application:
+    name: eurekaserver
+
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    # Eureka should NOT register itself with itself
+    register-with-eureka: false
+    fetch-registry: false
+    service-url:
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+  server:
+    # Turns off the red warning banner in dev when services go down
+    enable-self-preservation: false
+    # How fast Eureka removes a dead instance (in ms) — faster in dev
+    eviction-interval-timer-in-ms: 5000

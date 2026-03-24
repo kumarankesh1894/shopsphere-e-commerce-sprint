@@ -1,0 +1,24 @@
+
+server:
+  port: 8081
+spring:
+  application:
+    name: authservice
+  datasource:
+    url: jdbc:mysql://localhost:3306/user_db?createDatabaseIfNotExist=true
+    username: password
+    password: password
+  jpa:     #it is under spring, not under datasource
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+eureka:            #eureka is at root level, not under spring
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+jwt:
+  secret: secretKey
+  expiration: expirationtime # in milliseconds
