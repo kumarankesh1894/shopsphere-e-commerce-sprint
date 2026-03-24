@@ -15,8 +15,13 @@ import com.shopsphere.authservice.security.JwtUtil;
 import com.shopsphere.authservice.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.resource.VersionResourceResolver;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +31,7 @@ public class AuthServiceImpl implements AuthService {
     private final ModelMapper modelMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final AuthenticationManager authenticationManager;
 
     @Override
     public UserResponse signup(SignupRequest signupRequest) {
@@ -44,16 +50,35 @@ public class AuthServiceImpl implements AuthService {
         //Mapping Entity -> DTO
         return modelMapper.map(savedUser, UserResponse.class);
     }
+    /*
+    * Step 1: Create an authentication request object as This object contains the user's email and password entered during login
+    *  It is NOT authenticated yet, just holds credentials
+    * Step 2: Pass the authentication request to AuthenticationManager
+    * This is the main component of Spring Security responsible for authentication, internally
+    * 1. Call UserDetailsService.loadUserByUsername(email)
+    * 2. Fetch user from database
+    * 3. Use PasswordEncoder to compare passwords
+    * 4. If valid → return authenticated object
+    * 5. If invalid → throw exception (BadCredentialsException)
+    *  Step 3: Extract the authenticated user (principal)
+    * After successful authentication, Spring returns a fully authenticated object
+    * "principal" contains the actual logged-in user (our User entity)
+    *
+    * */
 
     @Override
     public AuthResponse login(LoginRequest loginRequest) {
-       User user = userRepository.findByEmail(loginRequest.getEmail())
-                .orElseThrow(()-> new UserNotFoundException("User not found with this email: "+ loginRequest.getEmail()));
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        loginRequest.getEmail(),
+                        loginRequest.getPassword()
+                )
+        );
+
+        User user = (User) authentication.getPrincipal();
+    //Apply custom business logic, Spring Security does not know about your "active" field, so you must manually check it
         if(!user.getActive()){
             throw new UserInactiveException("User is not active");
-        }
-        if(!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())){
-            throw new InvalidCredentialsException("Invalid credentials");
         }
 
         //Generate JWT token and return it in the response
