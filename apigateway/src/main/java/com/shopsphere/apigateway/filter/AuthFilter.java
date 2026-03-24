@@ -54,6 +54,18 @@ public class AuthFilter implements GlobalFilter, Ordered{
             String role = jwtUtil.extractRole(claims);
             Long userId = jwtUtil.extractUserId(claims);
 
+            // step 4: Role-Based Authorization
+            String pathRequested = request.getURI().getPath();
+
+            //Admin Endpoints
+            if(pathRequested.startsWith("/api/admin") && !role.equals("ADMIN")){
+                return onError(exchange, "Forbidden: Admins only", HttpStatus.FORBIDDEN);
+            }
+
+            //User Endpoints (Admin can also access)
+            if(pathRequested.startsWith("/api/user") && !(role.equals("USER") || role.equals("ADMIN"))){
+                return onError(exchange, "Forbidden: Users only", HttpStatus.FORBIDDEN);
+            }
             //  Forward headers
             ServerHttpRequest modifiedRequest = request.mutate()
                     .header("X-Email", email)
