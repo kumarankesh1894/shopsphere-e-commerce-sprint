@@ -9,6 +9,7 @@
         <outputRelativeToContentRoot value="true" />
         <module name="eurekaserver" />
         <module name="apigateway" />
+        <module name="catalogservice" />
         <module name="authservice" />
       </profile>
     </annotationProcessing>
@@ -17,6 +18,7 @@
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="apigateway" options="-parameters" />
       <module name="authservice" options="-parameters" />
+      <module name="catalogservice" options="-parameters" />
       <module name="eurekaserver" options="-parameters" />
     </option>
   </component>
