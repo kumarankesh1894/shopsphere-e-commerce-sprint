@@ -45,6 +45,10 @@ public class ProductSpecification {
             */
             Predicate predicate = cb.conjunction();
 
+            //ALWAYS filter available products
+            predicate = cb.and(predicate,
+                        cb.equal(root.get("isAvailable"), true));
+
             /*
             * These "if" are the heart of the code
             * The code checks each filter one by one.

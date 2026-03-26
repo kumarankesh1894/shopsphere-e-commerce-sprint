@@ -2,12 +2,15 @@ package com.shopsphere.catalogservice.controller;
 
 import com.shopsphere.catalogservice.dto.*;
 import com.shopsphere.catalogservice.services.ProductService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+@Tag(name = "Product APIs", description = "Operations related to products")
 @RestController
 @RequestMapping("/api/catalog/products")
 @RequiredArgsConstructor
@@ -15,6 +18,7 @@ public class ProductController {
 
     private final ProductService productService;
 
+    @Operation(summary = "Get product by ID", description = "Fetch a product using its ID (Public API)")
     // PUBLIC → Get product by ID
     @GetMapping("/public/{id}")
     public ResponseEntity<ApiResponse<ProductResponse>> getProductById(
@@ -26,6 +30,8 @@ public class ProductController {
                 .body(ApiResponse.success(product, "Product fetched successfully"));
     }
 
+
+    @Operation(summary = "Get all products", description = "Fetch paginated list of products with sorting")
     // PUBLIC → Get all products (pagination + sorting)
     @GetMapping("/public")
     public ResponseEntity<ApiResponse<PaginationResponse<ProductResponse>>> getAllProducts(
@@ -42,6 +48,7 @@ public class ProductController {
                 .body(ApiResponse.success(products, "Products fetched successfully"));
     }
 
+    @Operation(summary = "Search products", description = "Search products using filters like keyword, category, price range")
     // PUBLIC → Search + Filter + Pagination
     @GetMapping("/public/search")
     public ResponseEntity<ApiResponse<PaginationResponse<ProductResponse>>> searchProducts(
@@ -68,6 +75,7 @@ public class ProductController {
                 .body(ApiResponse.success(result, "Filtered products fetched successfully"));
     }
 
+    @Operation(summary = "Create product", description = "Admin creates a new product")
     // ADMIN → Create product
     @PostMapping("/private")
     public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
@@ -79,6 +87,7 @@ public class ProductController {
                 .body(ApiResponse.success(product, "Product created successfully"));
     }
 
+    @Operation(summary = "Update product", description = "Admin updates an existing product")
     // ADMIN → Update product
     @PutMapping("/private/{id}")
     public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
@@ -91,6 +100,7 @@ public class ProductController {
                 .body(ApiResponse.success(product, "Product updated successfully"));
     }
 
+    @Operation(summary = "Delete product", description = "Admin performs soft delete on product")
     // ADMIN → Delete product (soft delete)
     @DeleteMapping("/private/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteProduct(@PathVariable Long id) {

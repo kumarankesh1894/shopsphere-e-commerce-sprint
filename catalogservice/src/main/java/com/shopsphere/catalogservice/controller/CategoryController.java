@@ -5,6 +5,8 @@ import com.shopsphere.catalogservice.dto.ApiResponse;
 import com.shopsphere.catalogservice.dto.CategoryRequest;
 import com.shopsphere.catalogservice.dto.CategoryResponse;
 import com.shopsphere.catalogservice.services.CategoryService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -12,12 +14,14 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Tag(name = "Category APIs", description = "Operations related to categories")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/catalog/categories")
 public class CategoryController {
         private final CategoryService categoryService;
 
+    @Operation(summary = "Get all categories", description = "Fetch all available categories")
     @GetMapping("/public")
     public ResponseEntity<ApiResponse<List<CategoryResponse>>> getAllCategories() {
 
@@ -27,6 +31,7 @@ public class CategoryController {
                 .body(ApiResponse.success(categories, "Categories fetched successfully"));
     }
 
+    @Operation(summary = "Get category by ID", description = "Fetch category details using ID")
     @GetMapping("/public/{id}")
     public ResponseEntity<ApiResponse<CategoryResponse>> getCategoryById(
             @PathVariable Long id) {
@@ -37,6 +42,7 @@ public class CategoryController {
                 .body(ApiResponse.success(category, "Category fetched successfully"));
     }
 
+    @Operation(summary = "Create category", description = "Admin creates a new category")
     //Only ADMIN can CREATE Category
     @PostMapping("/private")
     public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(
@@ -48,6 +54,7 @@ public class CategoryController {
                 .body(ApiResponse.success(response, "Category created successfully"));
     }
 
+    @Operation(summary = "Update category", description = "Admin updates category details")
     //Only ADMIN can UPDATE Category
     @PutMapping("/private/{id}")
     public ResponseEntity<ApiResponse<CategoryResponse>> updateCategory(
@@ -60,6 +67,7 @@ public class CategoryController {
                 .body(ApiResponse.success(updated, "Category updated successfully"));
     }
 
+    @Operation(summary = "Delete category", description = "Admin deletes a category")
     //Only ADMIN can DELETE Category
     @DeleteMapping("/private/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteCategory(@PathVariable Long id) {

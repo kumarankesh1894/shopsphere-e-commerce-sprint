@@ -5,6 +5,7 @@ import com.shopsphere.catalogservice.Specification.ProductSpecification;
 import com.shopsphere.catalogservice.dto.PaginationResponse;
 import com.shopsphere.catalogservice.dto.ProductFilterRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -25,7 +26,7 @@ import com.shopsphere.catalogservice.exception.ProductNotFoundException;
 
 import java.util.List;
 
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProductServiceImpl implements ProductService {
@@ -44,9 +45,19 @@ public class ProductServiceImpl implements ProductService {
     @Cacheable(value = "products", key = "#id")
     @Override
     public ProductResponse getProductById(Long id) {
-        Product product = productRepository.findById(id)
-                .orElseThrow(() ->
-                        new ProductNotFoundException("Product not found with id: " + id));
+
+        log.info("Fetching product from DB (NOT CACHE)");
+
+        log.info("Fetching product with id: {}", id);
+
+        Product product = productRepository.findByProductIdAndIsAvailableTrue(id)
+                .orElseThrow(() -> {
+                    log.warn("Product not found with id: {}", id);
+                    return new ProductNotFoundException("Product not found with id: " + id);
+                });
+
+        log.info("Product fetched successfully with id: {}", id);
+
         return modelMapper.map(product, ProductResponse.class);
     }
 
@@ -55,10 +66,14 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public ProductResponse createProduct(ProductRequest productRequest) {
 
+        log.info("Creating product: {}", productRequest.getProductName());
+
         // Validate Category
         Category category = categoryRepository.findById(productRequest.getCategoryId())
-                .orElseThrow(() ->
-                        new CategoryNotFoundException("Category not found"));
+                .orElseThrow(() -> {
+                    log.warn("Category not found with id: {}", productRequest.getCategoryId());
+                    return new CategoryNotFoundException("Category not found");
+                });
 
         //  Map DTO → Entity
         Product product = modelMapper.map(productRequest, Product.class);
@@ -68,7 +83,7 @@ public class ProductServiceImpl implements ProductService {
         product.setIsAvailable(true); // Default to available when creating
 
         Product savedProduct = productRepository.save(product);
-
+        log.info("Product created successfully with id: {}", savedProduct.getProductId());
         return modelMapper.map(savedProduct, ProductResponse.class);
     }
 
@@ -77,20 +92,27 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public ProductResponse updateProduct(Long id, ProductRequest productRequest) {
 
+        log.info("Updating product with id: {}", id);
+
         Product product = productRepository.findById(id)
-                .orElseThrow(() ->
-                        new ProductNotFoundException("Product not found with id: " + id));
+                .orElseThrow(() -> {
+                    log.warn("Product not found for update with id: {}", id);
+                    return new ProductNotFoundException("Product not found with id: " + id);
+                });
 
         // Validate Category
         Category category = categoryRepository.findById(productRequest.getCategoryId())
-                .orElseThrow(() ->
-                        new CategoryNotFoundException("Category not found"));
-
+                .orElseThrow(() -> {
+                    log.warn("Category not found with id in Product updation: {}", productRequest.getCategoryId());
+                    return new CategoryNotFoundException("Category not found");
+                });
         // Update fields
         modelMapper.map(productRequest, product);
         product.setCategory(category);
 
         Product updatedProduct = productRepository.save(product);
+
+        log.info("Product updated successfully with id: {}", id);
 
         return modelMapper.map(updatedProduct, ProductResponse.class);
     }
@@ -99,21 +121,42 @@ public class ProductServiceImpl implements ProductService {
     @CacheEvict(value = {"products", "productsList", "productSearch"}, allEntries = true)
     @Override
     public void deleteProduct(Long id) {
+        log.info("Deleting product with id: {}", id);
+
         Product product = productRepository.findById(id)
-                .orElseThrow(() ->
-                        new ProductNotFoundException("Product not found with id: " + id));
+                .orElseThrow(() -> {
+                    log.warn("Product not found for deletion with id: {}", id);
+                    return new ProductNotFoundException("Product not found with id: " + id);
+                });
+
         product.setIsAvailable(false); // Mark as unavailable instead of deleting
         productRepository.save(product);
+        log.info("Product soft deleted successfully with id: {}", id);
+
     }
+    //Created a constant list of allowed sort fields to prevent invalid sorting parameters
+    private static final List<String> allowedSortFields =
+            List.of("productId", "productName", "price", "stock", "createdAt", "updatedAt");
 
     // Get All the data with pagination and sorting
     @Cacheable(value = "productsList", key = "#page + '-' + #size + '-' + #sortBy + '-' + #sortDir")
     @Override
     public PaginationResponse<ProductResponse> getAllProducts(int page, int size, String sortBy, String sortDir) {
 
-        Pageable pageable = PageRequest.of(page, size);
+        log.info("Fetching products - page: {}, size: {}, sortBy: {}, sortDir: {}", page, size, sortBy, sortDir);
+        // Validate sort field
+        if (!allowedSortFields.contains(sortBy)) {
+            log.warn("Invalid sort field '{}', defaulting to productId", sortBy);
 
-        Page<Product> productPage = productRepository.findAll(pageable);
+            sortBy = "productId";
+        }
+
+        Sort sort = sortDir.equalsIgnoreCase("asc")
+                ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        Page<Product> productPage = productRepository.findByIsAvailableTrue(pageable);
 
         List<ProductResponse> content = productPage.getContent()
                 .stream()
@@ -141,6 +184,14 @@ public class ProductServiceImpl implements ProductService {
             int size,
             String sortBy,
             String sortDir) {
+
+        log.info("Searching products with filters: keyword={}, categoryId={}, minPrice={}, maxPrice={}",
+                filter.getKeyword(), filter.getCategoryId(), filter.getMinPrice(), filter.getMaxPrice());
+
+            // Validate sort field
+        if (!allowedSortFields.contains(sortBy)) {
+            sortBy = "productId";
+        }
         //Sorting
         Sort sort = sortDir.equalsIgnoreCase("asc")
                 ? Sort.by(sortBy).ascending()
@@ -160,7 +211,7 @@ public class ProductServiceImpl implements ProductService {
                 .map(product -> modelMapper.map(product, ProductResponse.class))
                 .toList();
 
-        // 🔥 Return custom pagination response
+        // Return custom pagination response
         return new PaginationResponse<>(
                 content,
                 productPage.getNumber(),
