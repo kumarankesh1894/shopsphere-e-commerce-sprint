@@ -26,9 +26,9 @@ public class AuthFilter implements GlobalFilter, Ordered{
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getURI().getPath();
 
-        //Skip the auth endpoints
-        if(path.equals("/api/auth/signup") || path.equals("/api/auth/login")){ // add here whatever other public endpoints you want to exclude from authentication
-            return chain.filter(exchange); //allow auth endpoints to pass through without token validation
+        //Skip the endpoints
+        if(isPublic(path) ){ // isPublic method created below where i had put all the public endpoints
+            return chain.filter(exchange); //allow endpoints to pass through without token validation
         }
 
         // step 1: Check if Authorization header is present
@@ -55,17 +55,21 @@ public class AuthFilter implements GlobalFilter, Ordered{
             Long userId = jwtUtil.extractUserId(claims);
 
             // step 4: Role-Based Authorization
-            String pathRequested = request.getURI().getPath();
 
-            //Admin Endpoints
-            if(pathRequested.startsWith("/api/admin") && !role.equals("ADMIN")){
+            boolean isAdminRoute = path.startsWith("/api/admin")
+                    || path.startsWith("/api/catalog/private");
+
+            boolean isUserRoute = path.startsWith("/api/user");
+
+            if (isAdminRoute && !role.equals("ADMIN")) {
                 return onError(exchange, "Forbidden: Admins only", HttpStatus.FORBIDDEN);
             }
 
-            //User Endpoints (Admin can also access)
-            if(pathRequested.startsWith("/api/user") && !(role.equals("USER") || role.equals("ADMIN"))){
+            if (isUserRoute && !(role.equals("USER") || role.equals("ADMIN"))) {
                 return onError(exchange, "Forbidden: Users only", HttpStatus.FORBIDDEN);
             }
+
+
             //  Forward headers
             ServerHttpRequest modifiedRequest = request.mutate()
                     .header("X-Email", email)
@@ -91,6 +95,12 @@ public class AuthFilter implements GlobalFilter, Ordered{
         return response.writeWith(Mono.just(buffer));
     }
 
+    private Boolean isPublic(String path){
+        return path.startsWith("/api/auth/signup")
+                ||path.startsWith("/api/auth/login")
+                || path.contains("/public");
+
+    }
     @Override
     public int getOrder() {
         return -1; // -1 set high precedence for this filter to run before other filters
