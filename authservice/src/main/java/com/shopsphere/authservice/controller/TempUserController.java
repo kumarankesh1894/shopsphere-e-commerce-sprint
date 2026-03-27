@@ -21,9 +21,9 @@ public class TempUserController {
     // Basic admin test endpoint
     @GetMapping("/admin/dashboard")
     public String getAdminDashboard(
-            @RequestHeader("X-Email") String email,
-            @RequestHeader("X-Role") String role,
-            @RequestHeader("X-UserId") String userId
+            @RequestHeader(value = "X-Email",required = false) String email,
+            @RequestHeader(value = "X-Role",required = false) String role,
+            @RequestHeader(value = "X-UserId",required = false) String userId
     ) {
         return "Admin Dashboard → Email: " + email + ", Role: " + role + ", ID: " + userId;
     }
