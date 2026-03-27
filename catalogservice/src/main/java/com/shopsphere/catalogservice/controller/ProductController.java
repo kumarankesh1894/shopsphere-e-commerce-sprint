@@ -110,4 +110,12 @@ public class ProductController {
         return ResponseEntity.status(HttpStatus.OK)
                 .body(ApiResponse.success(null, "Product deleted successfully"));
     }
+
+    // for featured
+    @PatchMapping("/private/{id}/featured")
+    public ResponseEntity<ApiResponse<ProductResponse>> markFeatured(@PathVariable Long id) {
+        ProductResponse response = productService.markAsFeatured(id);
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(ApiResponse.success(response, "Product marked as featured successfully"));
+    }
 }

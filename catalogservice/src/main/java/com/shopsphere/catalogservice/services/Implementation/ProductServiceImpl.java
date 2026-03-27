@@ -222,5 +222,31 @@ public class ProductServiceImpl implements ProductService {
         );
     }
 
+    @CacheEvict(value = {"products", "productsList", "productSearch"}, allEntries = true)
+    @Override
+    public ProductResponse markAsFeatured(Long id) {
+        log.info("Marking product as featured with id: {}", id);
+
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.warn("Product not found while marking as featured. id: {}", id);
+                    return new ProductNotFoundException("Product not found with id: " + id);
+                });
+
+        // Check if already featured (optional but good practice)
+        if (Boolean.TRUE.equals(product.getFeatured())) {
+            log.info("Product already marked as featured. id: {}", id);
+        } else {
+            product.setFeatured(true);
+            log.debug("Setting product as featured. id: {}", id);
+        }
+
+        Product savedProduct = productRepository.save(product);
+
+        log.info("Product successfully marked as featured. id: {}", savedProduct.getProductId());
+
+        return modelMapper.map(savedProduct, ProductResponse.class);
+    }
+
 }
 

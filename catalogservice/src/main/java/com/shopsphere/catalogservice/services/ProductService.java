@@ -22,4 +22,5 @@ public interface ProductService {
             String sortBy,
             String sortDir);
 
+    ProductResponse markAsFeatured(Long id);
 }

@@ -4,7 +4,9 @@ package com.shopsphere.catalogservice.controller;
 import com.shopsphere.catalogservice.dto.ApiResponse;
 import com.shopsphere.catalogservice.dto.CategoryRequest;
 import com.shopsphere.catalogservice.dto.CategoryResponse;
+import com.shopsphere.catalogservice.dto.HomepageResponse;
 import com.shopsphere.catalogservice.services.CategoryService;
+import com.shopsphere.catalogservice.services.HomepageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +22,9 @@ import java.util.List;
 @RequestMapping("/api/catalog/categories")
 public class CategoryController {
         private final CategoryService categoryService;
+        private final HomepageService homeService;
 
+    // get all the data of the category and return it to the user
     @Operation(summary = "Get all categories", description = "Fetch all available categories")
     @GetMapping("/public")
     public ResponseEntity<ApiResponse<List<CategoryResponse>>> getAllCategories() {
@@ -31,6 +35,7 @@ public class CategoryController {
                 .body(ApiResponse.success(categories, "Categories fetched successfully"));
     }
 
+    // get the category by id and return it to the user
     @Operation(summary = "Get category by ID", description = "Fetch category details using ID")
     @GetMapping("/public/{id}")
     public ResponseEntity<ApiResponse<CategoryResponse>> getCategoryById(
@@ -42,8 +47,9 @@ public class CategoryController {
                 .body(ApiResponse.success(category, "Category fetched successfully"));
     }
 
-    @Operation(summary = "Create category", description = "Admin creates a new category")
+/* ----------------------------------------------Admin Part Start--------------------------------------------------------------------------------------*/
     //Only ADMIN can CREATE Category
+    @Operation(summary = "Create category", description = "Admin creates a new category")
     @PostMapping("/private")
     public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(
             @RequestBody CategoryRequest request) {
@@ -54,8 +60,8 @@ public class CategoryController {
                 .body(ApiResponse.success(response, "Category created successfully"));
     }
 
-    @Operation(summary = "Update category", description = "Admin updates category details")
     //Only ADMIN can UPDATE Category
+    @Operation(summary = "Update category", description = "Admin updates category details")
     @PutMapping("/private/{id}")
     public ResponseEntity<ApiResponse<CategoryResponse>> updateCategory(
             @PathVariable Long id,
@@ -67,8 +73,8 @@ public class CategoryController {
                 .body(ApiResponse.success(updated, "Category updated successfully"));
     }
 
-    @Operation(summary = "Delete category", description = "Admin deletes a category")
     //Only ADMIN can DELETE Category
+    @Operation(summary = "Delete category", description = "Admin deletes a category")
     @DeleteMapping("/private/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteCategory(@PathVariable Long id) {
 
@@ -77,4 +83,16 @@ public class CategoryController {
         return ResponseEntity.status(HttpStatus.OK)
                 .body(ApiResponse.success(null, "Category deleted successfully"));
     }
+
+
+    /*-----------------------------------------------------------Homepage Display-----------------------------------------------------------------------------------*/
+
+    /// mapping for accessing the home page - return categories and featuredProduct
+    @GetMapping("/public/home")
+    public ResponseEntity<ApiResponse<HomepageResponse>> getHomePageData() {
+        HomepageResponse homePageResponse = homeService.getHomepageData();
+        return ResponseEntity.status(HttpStatus.OK).body(ApiResponse.success(homePageResponse, "Homepage data fetched successfully"));
+    }
+
+
 }

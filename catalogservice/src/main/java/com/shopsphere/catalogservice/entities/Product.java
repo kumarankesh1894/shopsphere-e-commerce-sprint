@@ -34,6 +34,10 @@ public class Product {
         private Integer stock;
         private Boolean isAvailable = true;
 
+        // Featured products are highlighted on the homepage and category pages
+        @Column(nullable = false)
+        private Boolean featured;
+
     // Many products → one category
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)
@@ -45,4 +49,6 @@ public class Product {
     @UpdateTimestamp
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm")
     private LocalDateTime updatedAt;
+
+
 }
