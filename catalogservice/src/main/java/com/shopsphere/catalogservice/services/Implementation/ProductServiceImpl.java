@@ -58,7 +58,13 @@ public class ProductServiceImpl implements ProductService {
 
         log.info("Product fetched successfully with id: {}", id);
 
-        return modelMapper.map(product, ProductResponse.class);
+        ProductResponse response = modelMapper.map(product, ProductResponse.class);
+
+        //CRITICAL FIX (just 2 lines)
+        response.setStock(product.getStock());
+        response.setPrice(product.getPrice());
+
+        return response;
     }
 
     //Create the product with validation of category and mapping DTO to Entity
@@ -222,6 +228,10 @@ public class ProductServiceImpl implements ProductService {
         );
     }
 
+    /*
+    * Logic to mark a product as featured, which is a common requirement in e-commerce platforms to highlight certain products.
+    * This method also ensures that the cache is evicted to maintain data consistency across the application.
+    * */
     @CacheEvict(value = {"products", "productsList", "productSearch"}, allEntries = true)
     @Override
     public ProductResponse markAsFeatured(Long id) {
@@ -246,6 +256,35 @@ public class ProductServiceImpl implements ProductService {
         log.info("Product successfully marked as featured. id: {}", savedProduct.getProductId());
 
         return modelMapper.map(savedProduct, ProductResponse.class);
+    }
+
+    /*
+    * logic to reduce stock of a product, which is crucial for inventory management in an e-commerce application.
+    * This method checks if the product exists and if there is sufficient stock before reducing it.
+    * It also ensures that the cache is evicted to maintain data consistency across the application.
+    * */
+    @CacheEvict(value = {"products", "productsList", "productSearch"}, allEntries = true)
+    @Override
+    public void reduceStock(Long productId, Integer quantity) {
+
+        log.info("Reducing stock for productId: {}, quantity: {}", productId, quantity);
+
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> {
+                    log.warn("Product not found while reducing stock. id: {}", productId);
+                    return new ProductNotFoundException("Product not found");
+                });
+
+        if (product.getStock() < quantity) {
+            log.warn("Insufficient stock for productId: {}", productId);
+            throw new RuntimeException("Insufficient stock");
+        }
+
+        product.setStock(product.getStock() - quantity);
+
+        productRepository.save(product);
+
+        log.info("Stock reduced successfully for productId: {}", productId);
     }
 
 }

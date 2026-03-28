@@ -23,4 +23,6 @@ public interface ProductService {
             String sortDir);
 
     ProductResponse markAsFeatured(Long id);
+
+    void reduceStock(Long productId, Integer quantity);
 }

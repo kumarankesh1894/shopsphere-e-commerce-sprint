@@ -112,10 +112,25 @@ public class ProductController {
     }
 
     // for featured
+    @Operation(summary = "Mark product as featured", description = "Admin marks a product as featured")
     @PatchMapping("/private/{id}/featured")
     public ResponseEntity<ApiResponse<ProductResponse>> markFeatured(@PathVariable Long id) {
         ProductResponse response = productService.markAsFeatured(id);
         return ResponseEntity.status(HttpStatus.OK)
                 .body(ApiResponse.success(response, "Product marked as featured successfully"));
+    }
+
+    //to reduce stock
+    @Operation(summary = "Reduce product stock", description = "Reduce stock after order payment")
+    @PutMapping("/private/{id}/reducestock")
+    public ResponseEntity<ApiResponse<Void>> reduceStock(
+            @PathVariable Long id,
+            @RequestParam Integer quantity
+    ) {
+        productService.reduceStock(id, quantity);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(null, "Stock reduced successfully")
+        );
     }
 }

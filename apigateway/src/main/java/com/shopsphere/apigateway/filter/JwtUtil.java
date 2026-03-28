@@ -20,7 +20,7 @@ public class JwtUtil {
     //Build the signing key using the secret key
     private SecretKey getSigningKey(){
 
-        return Keys.hmacShaKeyFor(secret.getBytes()); //HMAC-SHA algorithm for signing the JWT
+        return Keys.hmacShaKeyFor(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8)); //HMAC-SHA algorithm for signing the JWT
     }
 
     //parse JWT once
