@@ -17,6 +17,7 @@
         <module>eurekaserver</module>
         <module>orderservice</module>
         <module>paymentservice</module>
+        <module>adminservice</module>
 
     </modules>
 
