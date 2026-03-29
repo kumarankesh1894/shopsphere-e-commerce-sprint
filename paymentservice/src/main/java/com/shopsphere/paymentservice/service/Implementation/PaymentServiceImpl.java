@@ -8,6 +8,7 @@ import com.shopsphere.paymentservice.enums.OrderStatus;
 import com.shopsphere.paymentservice.enums.PaymentStatus;
 import com.shopsphere.paymentservice.exception.PaymentException;
 import com.shopsphere.paymentservice.exception.PaymentVerificationException;
+import com.shopsphere.paymentservice.messaging.OrderStatusEventPublisher;
 import com.shopsphere.paymentservice.repository.PaymentRepository;
 import com.shopsphere.paymentservice.service.PaymentService;
 import com.razorpay.RazorpayException;
@@ -40,6 +41,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository paymentRepository;
     private final OrderClient orderClient;
     private final ModelMapper modelMapper;
+    private final OrderStatusEventPublisher orderStatusEventPublisher;
     /*
      * createRazorpayOrder(...) sends an HTTP request to Razorpay.
      * Instead of creating a brand-new client every time, this line creates one reusable
@@ -398,9 +400,15 @@ public class PaymentServiceImpl implements PaymentService {
      */
     private void safeUpdateOrderStatus(Long orderId, OrderStatus status) {
         try {
-            orderClient.updateOrderStatus(orderId, status);
+            OrderStatusUpdateEvent event = OrderStatusUpdateEvent.builder()
+                    .orderId(orderId)
+                    .status(status.name())
+                    .source("paymentservice")
+                    .occurredAt(LocalDateTime.now())
+                    .build();
+            orderStatusEventPublisher.publish(event);
         } catch (Exception ex) {
-            log.error("payment.order_status_update.failed orderId=" + orderId + " targetStatus=" + status, ex);
+            log.error("payment.order_status_publish.failed orderId=" + orderId + " targetStatus=" + status, ex);
         }
     }
 }

@@ -340,7 +340,14 @@ public class OrderServiceImpl implements OrderService {
      */
 
     @Override
+    @Transactional
     @CacheEvict(value = {"orderByUser", "orderHistory", "orderInternal"}, allEntries = true)
+    /*
+     * RabbitMQ note:
+     * This method is called by the RabbitMQ listener when paymentservice publishes status events.
+     * We keep this logic centralized so both async queue events and internal HTTP updates follow
+     * the same order-state rules and produce consistent DB updates.
+     */
     public void updateOrderStatus(Long orderId, OrderStatus status) {
         log.info("order.status.update.start orderId={} targetStatus={}", orderId, status);
 
@@ -371,6 +378,12 @@ public class OrderServiceImpl implements OrderService {
     }
 
 
+    /*
+     * RabbitMQ note:
+     * When a PAID event is received, this method reduces inventory item by item.
+     * It runs inside the same transaction as status update to keep state changes consistent.
+     * If an order has no items, we skip safely and log the reason.
+     */
     private void reduceStockForOrder(Order order) {
         if (order.getItems() == null || order.getItems().isEmpty()) {
             log.warn("order.stock_reduce.skipped orderId={} reason=no_items", order.getId());
