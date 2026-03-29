@@ -8,6 +8,7 @@ import com.shopsphere.orderservice.service.CartService;
 import com.shopsphere.orderservice.service.CheckoutService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 import jakarta.transaction.Transactional;
@@ -27,6 +28,7 @@ public class CheckoutServiceImpl implements CheckoutService {
 
     @Override
     @Transactional
+    @CacheEvict(value = {"orderByUser", "orderHistory", "orderInternal"}, allEntries = true)
     public CheckoutResponseDto startCheckout(Long userId, CheckoutRequestDto request) {
 
         // 1. Idempotency

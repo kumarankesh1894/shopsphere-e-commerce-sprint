@@ -24,6 +24,8 @@ import com.shopsphere.orderservice.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -74,6 +76,7 @@ public class OrderServiceImpl implements OrderService {
      * - Keeps response mapping consistent using shared mapper method
      */
     @Override
+    @Cacheable(value = "orderByUser", key = "#orderId + '-' + #userId")
     public OrderResponseDto getOrder(Long orderId, Long userId) {
         log.info("order.get.start orderId={} userId={}", orderId, userId);
 
@@ -109,6 +112,7 @@ public class OrderServiceImpl implements OrderService {
      * - Never returns other users' orders
      */
     @Override
+    @Cacheable(value = "orderHistory", key = "#userId + '-' + #page + '-' + #size + '-' + (#status == null ? 'ALL' : #status)")
     public OrderHistoryPageDto getMyOrders(Long userId, int page, int size, String status) {
         log.info("order.history.start userId={} page={} size={} status={}", userId, page, size, status);
         int safePage = Math.max(page, 0);
@@ -161,6 +165,7 @@ public class OrderServiceImpl implements OrderService {
      * - Store packedAt audit timestamp
      */
     @Override
+    @CacheEvict(value = {"orderByUser", "orderHistory", "orderInternal"}, allEntries = true)
     public void placeOrder(Long orderId) {
         log.info("order.lifecycle.pack.start orderId={}", orderId);
 
@@ -193,6 +198,7 @@ public class OrderServiceImpl implements OrderService {
      * - Store shippedAt audit timestamp
      */
     @Override
+    @CacheEvict(value = {"orderByUser", "orderHistory", "orderInternal"}, allEntries = true)
     public void shipOrder(Long orderId) {
         log.info("order.lifecycle.ship.start orderId={}", orderId);
         Order order = orderRepository.findById(orderId)
@@ -227,6 +233,7 @@ public class OrderServiceImpl implements OrderService {
      * - Store deliveredAt audit timestamp
      */
     @Override
+    @CacheEvict(value = {"orderByUser", "orderHistory", "orderInternal"}, allEntries = true)
     public void deliverOrder(Long orderId) {
         log.info("order.lifecycle.deliver.start orderId={}", orderId);
         Order order = orderRepository.findById(orderId)
@@ -256,6 +263,7 @@ public class OrderServiceImpl implements OrderService {
      * - Apply cancellation status and timestamp
      */
     @Override
+    @CacheEvict(value = {"orderByUser", "orderHistory", "orderInternal"}, allEntries = true)
     public void cancelOrder(Long orderId, Long userId) {
         log.info("order.cancel.user.start orderId={} userId={}", orderId, userId);
         Order order = orderRepository.findById(orderId)
@@ -288,6 +296,7 @@ public class OrderServiceImpl implements OrderService {
      * - Apply cancellation status and timestamp
      */
     @Override
+    @CacheEvict(value = {"orderByUser", "orderHistory", "orderInternal"}, allEntries = true)
     public void cancelOrderAsAdmin(Long orderId) {
         log.info("order.cancel.admin.start orderId={}", orderId);
         Order order = orderRepository.findById(orderId)
@@ -327,6 +336,7 @@ public class OrderServiceImpl implements OrderService {
      */
 
     @Override
+    @CacheEvict(value = {"orderByUser", "orderHistory", "orderInternal"}, allEntries = true)
     public void updateOrderStatus(Long orderId, OrderStatus status) {
         log.info("order.status.update.start orderId={} targetStatus={}", orderId, status);
 
@@ -356,6 +366,7 @@ public class OrderServiceImpl implements OrderService {
         log.info("order.cancel.apply.success orderId={} newStatus=CANCELLED", order.getId());
     }
 
+
     private void reduceStockForOrder(Order order) {
         if (order.getItems() == null || order.getItems().isEmpty()) {
             log.warn("order.stock_reduce.skipped orderId={} reason=no_items", order.getId());
@@ -365,7 +376,7 @@ public class OrderServiceImpl implements OrderService {
         for (var item : order.getItems()) {
             log.info("order.stock_reduce.item orderId={} productId={} quantity={}",
                     order.getId(),
-                    item.getProductId(), item.getQuantity(), order.getId());
+                    item.getProductId(), item.getQuantity());
             catalogClient.reduceStock(item.getProductId(), item.getQuantity());
         }
         log.info("order.stock_reduce.success orderId={}", order.getId());
@@ -377,6 +388,7 @@ public class OrderServiceImpl implements OrderService {
      */
     @Override
     public Order getOrderById(Long orderId) {
+        log.info("order.internal.fetch_db orderId={}", orderId);
         return orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException("Order not found"));
     }
