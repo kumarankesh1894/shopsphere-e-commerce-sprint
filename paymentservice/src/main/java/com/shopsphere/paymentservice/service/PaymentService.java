@@ -6,7 +6,16 @@ import com.shopsphere.paymentservice.dto.PaymentVerificationRequestDto;
 
 public interface PaymentService {
 
+    // =============================
+    // User APIs (called from order flow)
+    // =============================
+
     PaymentResponseDto createPayment(PaymentRequestDto request);
 
     PaymentResponseDto verifyPayment(PaymentVerificationRequestDto request);
+
+    // =============================
+    // Admin APIs
+    // =============================
+    // Currently no admin-only payment service method is implemented.
 }

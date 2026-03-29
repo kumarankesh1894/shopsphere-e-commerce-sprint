@@ -42,6 +42,8 @@ public class GlobalExceptionHandler {
             OrderAlreadyPackedException.class,
             OrderAlreadyShippedException.class,
             OrderAlreadyDeliveredException.class,
+            OrderAlreadyCancelledException.class,
+            OrderCancellationNotAllowedException.class,
             OrderTransitionNotAllowedException.class
     })
     public ResponseEntity<ApiErrorResponse> handleOrderLifecycleConflict(RuntimeException ex,

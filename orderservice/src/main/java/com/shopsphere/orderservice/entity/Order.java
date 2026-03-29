@@ -1,13 +1,11 @@
 package com.shopsphere.orderservice.entity;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import com.shopsphere.orderservice.enums.OrderStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -39,6 +37,14 @@ public class Order {
     @Column(nullable = false)
 
     private LocalDateTime createdAt;
+
+    private LocalDateTime packedAt;
+
+    private LocalDateTime shippedAt;
+
+    private LocalDateTime deliveredAt;
+
+    private LocalDateTime cancelledAt;
 
     // 🔥 Address snapshot
     @Embedded

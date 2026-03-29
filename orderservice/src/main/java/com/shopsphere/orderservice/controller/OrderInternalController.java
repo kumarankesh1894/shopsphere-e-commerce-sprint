@@ -37,6 +37,19 @@ public class OrderInternalController {
 
     private final OrderService orderService;
 
+    /*
+     * What:
+     * Updates order lifecycle status from trusted internal callers.
+     *
+     * Why:
+     * Payment and other backend services need a direct status update API after
+     * async or cross-service processing.
+     *
+     * How:
+     * 1) Reads orderId path variable and target status query param.
+     * 2) Delegates transition logic to orderService.updateOrderStatus(...).
+     * 3) Returns empty 200 response on success.
+     */
     @PutMapping("/{orderId}/status")
     public ResponseEntity<Void> updateStatus(
             @PathVariable("orderId") Long orderId,
@@ -46,6 +59,19 @@ public class OrderInternalController {
         return ResponseEntity.ok().build();
     }
 
+    /*
+     * What:
+     * Returns minimal order payment context for internal payment flow.
+     *
+     * Why:
+     * Payment service requires order amount/user metadata to create and verify
+     * payment records.
+     *
+     * How:
+     * 1) Fetches raw order by id via orderService.getOrderById(...).
+     * 2) Maps required fields into OrderPaymentDto.
+     * 3) Returns lightweight DTO for service-to-service use.
+     */
     @GetMapping("/{orderId}")
     public ResponseEntity<OrderPaymentDto> getOrderForPayment(
             @PathVariable("orderId") Long orderId) {

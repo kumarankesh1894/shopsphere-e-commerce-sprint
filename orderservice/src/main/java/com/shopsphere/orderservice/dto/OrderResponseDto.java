@@ -22,6 +22,18 @@ public class OrderResponseDto {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm", timezone = "Asia/Kolkata")
     private LocalDateTime createdAt;
 
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm", timezone = "Asia/Kolkata")
+    private LocalDateTime packedAt;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm", timezone = "Asia/Kolkata")
+    private LocalDateTime shippedAt;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm", timezone = "Asia/Kolkata")
+    private LocalDateTime deliveredAt;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm", timezone = "Asia/Kolkata")
+    private LocalDateTime cancelledAt;
+
     private List<OrderItemResponseDto> items;
     private AddressDto address;
 }

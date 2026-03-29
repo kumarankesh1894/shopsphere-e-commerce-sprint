@@ -21,6 +21,10 @@ public class CategoryServiceImpl implements CategoryService {
     private final ModelMapper modelMapper;
     private final CategoryRepository categoryRepository;
 
+    // =============================
+    // User APIs
+    // =============================
+
     // Get category by ID with exception handling for not found case
     @Override
     public CategoryResponse getCategoryById(Long id) {
@@ -37,6 +41,10 @@ public class CategoryServiceImpl implements CategoryService {
         log.info("Category fetched successfully with id: {}", id);
         return modelMapper.map(category, CategoryResponse.class);
     }
+
+    // =============================
+    // Admin APIs
+    // =============================
 
     // Create category with mapping from DTO to Entity and saving to repository
     @Override
@@ -90,6 +98,10 @@ public class CategoryServiceImpl implements CategoryService {
         log.info("Category deleted successfully with id: {}", id);
 
     }
+
+    // =============================
+    // User APIs
+    // =============================
 
     // Get all categories with mapping from Entity to DTO for each category in the list
     @Override

@@ -9,10 +9,11 @@ import org.springframework.data.domain.Page;
 import java.util.List;
 
 public interface ProductService {
+    // =============================
+    // User APIs
+    // =============================
+
     ProductResponse getProductById(Long id);
-    ProductResponse createProduct(ProductRequest productRequest);
-    ProductResponse updateProduct(Long id, ProductRequest productRequest);
-    void deleteProduct(Long id);
     PaginationResponse<ProductResponse> getAllProducts(int page, int size, String sortBy, String sortDir);
 
     PaginationResponse<ProductResponse> searchProducts(
@@ -22,7 +23,18 @@ public interface ProductService {
             String sortBy,
             String sortDir);
 
+    // =============================
+    // Admin APIs
+    // =============================
+
+    ProductResponse createProduct(ProductRequest productRequest);
+    ProductResponse updateProduct(Long id, ProductRequest productRequest);
+    void deleteProduct(Long id);
     ProductResponse markAsFeatured(Long id);
+
+    // =============================
+    // Internal service-to-service APIs
+    // =============================
 
     void reduceStock(Long productId, Integer quantity);
 }

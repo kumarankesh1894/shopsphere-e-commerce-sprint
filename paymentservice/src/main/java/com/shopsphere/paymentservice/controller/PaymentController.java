@@ -6,6 +6,7 @@ import com.shopsphere.paymentservice.dto.PaymentVerificationRequestDto;
 import jakarta.validation.Valid;
 import com.shopsphere.paymentservice.service.PaymentService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -15,23 +16,63 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/payments/internal")
 @RequiredArgsConstructor
+@Slf4j
 public class PaymentController {
 
     private final PaymentService paymentService;
 
+    // =============================
+    // User APIs (called from order flow)
+    // =============================
+
+    /*
+     * What:
+     * Creates a new payment request for a given order.
+     *
+     * Why:
+     * Order service calls this when user starts payment, so backend can
+     * create and track one payment entry before verification.
+     *
+     * How:
+     * 1) Reads and validates orderId + idempotencyKey from request body.
+     * 2) Logs request details for troubleshooting.
+     * 3) Delegates business logic to paymentService.createPayment(...).
+     * 4) Returns payment initiation details (gateway order id, key id, status).
+     */
     @PostMapping
     public ResponseEntity<PaymentResponseDto> createPayment(
             @Valid @RequestBody PaymentRequestDto request) {
+        log.info("payment.controller.create.request orderId={}", request.getOrderId());
 
         return ResponseEntity.ok(
                 paymentService.createPayment(request)
         );
     }
 
+    /*
+     * What:
+     * Verifies the payment using gateway signature and marks final status.
+     *
+     * Why:
+     * Payment is not trusted until signature verification is successful.
+     * This step confirms payment authenticity before order is marked PAID.
+     *
+     * How:
+     * 1) Reads and validates razorpayOrderId, paymentId, and signature.
+     * 2) Logs verify request with order reference.
+     * 3) Delegates verification to paymentService.verifyPayment(...).
+     * 4) Returns updated payment state after verification logic.
+     */
     @PostMapping("/verify")
     public ResponseEntity<PaymentResponseDto> verifyPayment(
             @Valid @RequestBody PaymentVerificationRequestDto request) {
+        log.info("payment.controller.verify.request razorpayOrderId={}", request.getRazorpayOrderId());
 
         return ResponseEntity.ok(paymentService.verifyPayment(request));
     }
+
+    // =============================
+    // Admin APIs
+    // =============================
+    // Currently no admin-only payment endpoint is implemented.
 }

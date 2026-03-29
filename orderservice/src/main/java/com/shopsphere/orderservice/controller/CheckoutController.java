@@ -15,6 +15,19 @@ public class CheckoutController {
 
     private final CheckoutService checkoutService;
 
+    /*
+     * What:
+     * Starts checkout for the current user and selected cart/request context.
+     *
+     * Why:
+     * Checkout creates a concrete order payload from cart and delivery inputs
+     * before payment begins.
+     *
+     * How:
+     * 1) Reads authenticated userId and validates checkout request body.
+     * 2) Delegates orchestration to checkoutService.startCheckout(...).
+     * 3) Returns order/checkout response details to client.
+     */
     @PostMapping("/start")
     public ResponseEntity<ApiResponse<CheckoutResponseDto>> startCheckout(
             @RequestHeader("X-UserId") Long userId,

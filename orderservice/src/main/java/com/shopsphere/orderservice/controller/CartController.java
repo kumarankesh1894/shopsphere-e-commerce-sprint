@@ -16,7 +16,18 @@ public class CartController {
 
     private final CartService cartService;
 
-    // Add item to cart
+    /*
+     * What:
+     * Adds one product entry to the current user's cart.
+     *
+     * Why:
+     * Cart must capture item + quantity before checkout can create an order.
+     *
+     * How:
+     * 1) Reads authenticated userId from header.
+     * 2) Validates and forwards item payload to cartService.addToCart(...).
+     * 3) Returns updated cart snapshot.
+     */
     @PostMapping("/items")
     public ResponseEntity<ApiResponse<CartResponseDto>> addToCart(
             @RequestHeader("X-UserId") Long userId,
@@ -29,7 +40,18 @@ public class CartController {
         );
     }
 
-    // Get current cart
+    /*
+     * What:
+     * Fetches the active cart for the logged-in user.
+     *
+     * Why:
+     * Cart page needs latest totals/items after add/update/remove operations.
+     *
+     * How:
+     * 1) Reads userId from X-UserId.
+     * 2) Delegates retrieval to cartService.getCart(...).
+     * 3) Wraps cart DTO in ApiResponse.
+     */
     @GetMapping
     public ResponseEntity<ApiResponse<CartResponseDto>> getCart(
             @RequestHeader("X-UserId") Long userId
@@ -41,7 +63,18 @@ public class CartController {
         );
     }
 
-    // Update item quantity
+    /*
+     * What:
+     * Updates quantity for a specific product already in the user's cart.
+     *
+     * Why:
+     * Users need quantity adjustments without removing/re-adding items.
+     *
+     * How:
+     * 1) Reads userId, productId, and quantity from request.
+     * 2) Delegates update validation + persistence to cartService.updateItem(...).
+     * 3) Returns refreshed cart state.
+     */
     @PutMapping("/items/{productId}")
     public ResponseEntity<ApiResponse<CartResponseDto>> updateCartItem(
             @RequestHeader("X-UserId") Long userId,
@@ -55,8 +88,18 @@ public class CartController {
         );
     }
 
-    // Remove item from cart
-
+    /*
+     * What:
+     * Removes one product from the current user's cart.
+     *
+     * Why:
+     * Lets user clean up cart content before checkout.
+     *
+     * How:
+     * 1) Reads userId and productId.
+     * 2) Delegates removal to cartService.removeItem(...).
+     * 3) Returns updated cart details.
+     */
     @DeleteMapping("/items/{productId}")
     public ResponseEntity<ApiResponse<CartResponseDto>> removeItem(
             @RequestHeader("X-UserId") Long userId,
@@ -69,8 +112,18 @@ public class CartController {
         );
     }
 
-        // Clear cart
-
+    /*
+     * What:
+     * Clears all items from the user's cart.
+     *
+     * Why:
+     * Useful when user wants to start a new shopping session quickly.
+     *
+     * How:
+     * 1) Reads authenticated userId.
+     * 2) Calls cartService.clearCart(...).
+     * 3) Returns success confirmation message.
+     */
     @DeleteMapping("/clear")
     public ResponseEntity<ApiResponse<String>> clearCart(
             @RequestHeader("X-UserId") Long userId

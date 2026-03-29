@@ -24,7 +24,22 @@ public class CategoryController {
         private final CategoryService categoryService;
         private final HomepageService homeService;
 
-    // get all the data of the category and return it to the user
+    // =============================
+    // User APIs
+    // =============================
+
+    /*
+     * What:
+     * Returns all catalog categories.
+     *
+     * Why:
+     * Category listing is needed for navigation, filtering, and homepage sections.
+     *
+     * How:
+     * 1) Calls categoryService.getAllCategories(...).
+     * 2) Wraps result list in ApiResponse.
+     * 3) Returns HTTP 200.
+     */
     @Operation(summary = "Get all categories", description = "Fetch all available categories")
     @GetMapping("/public")
     public ResponseEntity<ApiResponse<List<CategoryResponse>>> getAllCategories() {
@@ -35,7 +50,18 @@ public class CategoryController {
                 .body(ApiResponse.success(categories, "Categories fetched successfully"));
     }
 
-    // get the category by id and return it to the user
+    /*
+     * What:
+     * Fetches one category by id.
+     *
+     * Why:
+     * Category details endpoint supports targeted views and admin checks.
+     *
+     * How:
+     * 1) Reads category id from path.
+     * 2) Delegates lookup to categoryService.getCategoryById(...).
+     * 3) Returns category DTO in ApiResponse.
+     */
     @Operation(summary = "Get category by ID", description = "Fetch category details using ID")
     @GetMapping("/public/{id}")
     public ResponseEntity<ApiResponse<CategoryResponse>> getCategoryById(
@@ -47,8 +73,22 @@ public class CategoryController {
                 .body(ApiResponse.success(category, "Category fetched successfully"));
     }
 
-/* ----------------------------------------------Admin Part Start--------------------------------------------------------------------------------------*/
-    //Only ADMIN can CREATE Category
+    // =============================
+    // Admin APIs
+    // =============================
+
+    /*
+     * What:
+     * Creates a new category.
+     *
+     * Why:
+     * Admins need to extend catalog taxonomy as product domains evolve.
+     *
+     * How:
+     * 1) Reads category payload from request body.
+     * 2) Delegates creation to categoryService.createCategory(...).
+     * 3) Returns created category response with HTTP 201.
+     */
     @Operation(summary = "Create category", description = "Admin creates a new category")
     @PostMapping("/private")
     public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(
@@ -60,7 +100,18 @@ public class CategoryController {
                 .body(ApiResponse.success(response, "Category created successfully"));
     }
 
-    //Only ADMIN can UPDATE Category
+    /*
+     * What:
+     * Updates category metadata for an existing category id.
+     *
+     * Why:
+     * Admins need to correct and maintain category names/details over time.
+     *
+     * How:
+     * 1) Reads id + update payload.
+     * 2) Delegates update logic to categoryService.updateCategory(...).
+     * 3) Returns updated category DTO.
+     */
     @Operation(summary = "Update category", description = "Admin updates category details")
     @PutMapping("/private/{id}")
     public ResponseEntity<ApiResponse<CategoryResponse>> updateCategory(
@@ -73,7 +124,18 @@ public class CategoryController {
                 .body(ApiResponse.success(updated, "Category updated successfully"));
     }
 
-    //Only ADMIN can DELETE Category
+    /*
+     * What:
+     * Deletes an existing category.
+     *
+     * Why:
+     * Admins need cleanup operations for unused or merged categories.
+     *
+     * How:
+     * 1) Reads category id.
+     * 2) Delegates delete operation to categoryService.deleteCategory(...).
+     * 3) Returns success response with null payload.
+     */
     @Operation(summary = "Delete category", description = "Admin deletes a category")
     @DeleteMapping("/private/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteCategory(@PathVariable Long id) {
@@ -84,10 +146,18 @@ public class CategoryController {
                 .body(ApiResponse.success(null, "Category deleted successfully"));
     }
 
-
-    /*-----------------------------------------------------------Homepage Display-----------------------------------------------------------------------------------*/
-
-    /// mapping for accessing the home page - return categories and featuredProduct
+    /*
+     * What:
+     * Returns homepage data bundle (categories + featured products).
+     *
+     * Why:
+     * Home screen needs a single aggregated payload for first-load performance.
+     *
+     * How:
+     * 1) Calls homeService.getHomepageData(...).
+     * 2) Wraps aggregate response in ApiResponse.
+     * 3) Returns HTTP 200 with homepage payload.
+     */
     @GetMapping("/public/home")
     public ResponseEntity<ApiResponse<HomepageResponse>> getHomePageData() {
         HomepageResponse homePageResponse = homeService.getHomepageData();

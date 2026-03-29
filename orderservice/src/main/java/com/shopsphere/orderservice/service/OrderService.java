@@ -8,14 +8,13 @@ import com.shopsphere.orderservice.enums.OrderStatus;
 
 
 public interface OrderService {
+    // =============================
+    // User APIs
+    // =============================
+
     OrderResponseDto getOrder(Long orderId, Long userId);
     OrderHistoryPageDto getMyOrders(Long userId, int page, int size, String status);
-    void updateOrderStatus(Long orderId, OrderStatus status);
-    void placeOrder(Long orderId);
-    void shipOrder(Long orderId);
-    void deliverOrder(Long orderId);
-
-    Order getOrderById(Long orderId);
+    void cancelOrder(Long orderId, Long userId);
 
     /*
      * Initiates checkout process for an order.
@@ -26,4 +25,21 @@ public interface OrderService {
      * - Trigger Payment Service
      */
     PaymentResponseDto startPayment(Long orderId, Long userId);
+
+    // =============================
+    // Admin APIs
+    // =============================
+
+    void placeOrder(Long orderId);
+    void shipOrder(Long orderId);
+    void deliverOrder(Long orderId);
+    void cancelOrderAsAdmin(Long orderId);
+
+    // =============================
+    // Internal service-to-service APIs
+    // =============================
+
+    void updateOrderStatus(Long orderId, OrderStatus status);
+
+    Order getOrderById(Long orderId);
 }

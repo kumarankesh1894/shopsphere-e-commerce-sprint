@@ -1,5 +1,6 @@
 package com.shopsphere.orderservice.service.implementation;
 
+import com.shopsphere.orderservice.client.CatalogServiceClient;
 import com.shopsphere.orderservice.client.PaymentClient;
 import com.shopsphere.orderservice.dto.AddressDto;
 import com.shopsphere.orderservice.dto.OrderHistoryPageDto;
@@ -10,15 +11,18 @@ import com.shopsphere.orderservice.dto.PaymentResponseDto;
 import com.shopsphere.orderservice.entity.Order;
 import com.shopsphere.orderservice.enums.OrderStatus;
 import com.shopsphere.orderservice.exception.InvalidOrderStateException;
+import com.shopsphere.orderservice.exception.OrderAlreadyCancelledException;
 import com.shopsphere.orderservice.exception.OrderAlreadyDeliveredException;
 import com.shopsphere.orderservice.exception.OrderAlreadyPackedException;
 import com.shopsphere.orderservice.exception.OrderAlreadyShippedException;
+import com.shopsphere.orderservice.exception.OrderCancellationNotAllowedException;
 import com.shopsphere.orderservice.exception.OrderNotFoundException;
 import com.shopsphere.orderservice.exception.OrderTransitionNotAllowedException;
 import com.shopsphere.orderservice.exception.UnauthorizedException;
 import com.shopsphere.orderservice.repository.OrderRepository;
 import com.shopsphere.orderservice.service.OrderService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -38,6 +42,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class OrderServiceImpl implements OrderService {
 
     private static final int MAX_PAGE_SIZE = 50;
@@ -45,6 +50,11 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final ModelMapper  modelMapper;
     private final PaymentClient paymentClient;
+    private final CatalogServiceClient catalogClient;
+
+    // =============================
+    // User APIs
+    // =============================
 
     /*
      * This method is used to fetch details of one specific order.
@@ -65,11 +75,14 @@ public class OrderServiceImpl implements OrderService {
      */
     @Override
     public OrderResponseDto getOrder(Long orderId, Long userId) {
+        log.info("order.get.start orderId={} userId={}", orderId, userId);
 
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException("Order not found"));
 
         if (!order.getUserId().equals(userId)) {
+                log.warn("order.get.unauthorized orderId={} requestedBy={} owner={}",
+                    orderId, userId, order.getUserId());
             throw new UnauthorizedException("You are not allowed to access this order");
         }
 
@@ -97,6 +110,7 @@ public class OrderServiceImpl implements OrderService {
      */
     @Override
     public OrderHistoryPageDto getMyOrders(Long userId, int page, int size, String status) {
+        log.info("order.history.start userId={} page={} size={} status={}", userId, page, size, status);
         int safePage = Math.max(page, 0);
         int safeSize = Math.max(1, Math.min(size, MAX_PAGE_SIZE));
 
@@ -112,6 +126,7 @@ public class OrderServiceImpl implements OrderService {
                 OrderStatus orderStatus = OrderStatus.valueOf(status.trim().toUpperCase());
                 orderPage = orderRepository.findByUserIdAndStatus(userId, orderStatus, pageable);
             } catch (IllegalArgumentException ex) {
+                log.warn("order.history.invalid_filter userId={} status={}", userId, status);
                 throw new IllegalArgumentException("Invalid status filter: " + status);
             }
         } else {
@@ -128,6 +143,170 @@ public class OrderServiceImpl implements OrderService {
                 .build();
     }
 
+
+    // =============================
+    // Admin APIs
+    // =============================
+
+    /*
+     * This method is responsible for finalizing an order after successful payment.
+     *
+     * It acts as the admin packing step in the order lifecycle.
+     *
+     * Responsibilities:
+     * - Fetch order by orderId
+     * - Validate current state is PAID
+     * - Prevent duplicate pack action
+     * - Move status to PACKED
+     * - Store packedAt audit timestamp
+     */
+    @Override
+    public void placeOrder(Long orderId) {
+        log.info("order.lifecycle.pack.start orderId={}", orderId);
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException("Order not found"));
+
+        if (order.getStatus() == OrderStatus.PACKED) {
+            throw new OrderAlreadyPackedException("Order is already packed and ready to ship.");
+        }
+
+        if (order.getStatus() != OrderStatus.PAID) {
+            throw new OrderTransitionNotAllowedException("Cannot pack order. Order must be in PAID state.");
+        }
+
+        order.setStatus(OrderStatus.PACKED); // or PLACED if you add it
+        order.setPackedAt(LocalDateTime.now());
+
+        orderRepository.save(order);
+        log.info("order.lifecycle.pack.success orderId={} newStatus=PACKED", orderId);
+    }
+
+    /*
+     * This method marks a packed order as shipped.
+     *
+     * Responsibilities:
+     * - Fetch order by orderId
+     * - Validate current state is PACKED
+     * - Prevent duplicate/invalid ship action
+     * - Move status to SHIPPED
+     * - Store shippedAt audit timestamp
+     */
+    @Override
+    public void shipOrder(Long orderId) {
+        log.info("order.lifecycle.ship.start orderId={}", orderId);
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException("Order not found"));
+
+        if (order.getStatus() == OrderStatus.SHIPPED) {
+            throw new OrderAlreadyShippedException("Order is already shipped.");
+        }
+
+        if (order.getStatus() == OrderStatus.DELIVERED) {
+            throw new OrderAlreadyDeliveredException("Order is already delivered.");
+        }
+
+        if (order.getStatus() != OrderStatus.PACKED) {
+            throw new OrderTransitionNotAllowedException("Cannot ship order. Order must be in PACKED state.");
+        }
+
+        order.setStatus(OrderStatus.SHIPPED);
+        order.setShippedAt(LocalDateTime.now());
+        orderRepository.save(order);
+        log.info("order.lifecycle.ship.success orderId={} newStatus=SHIPPED", orderId);
+    }
+
+    /*
+     * This method marks a shipped order as delivered.
+     *
+     * Responsibilities:
+     * - Fetch order by orderId
+     * - Validate current state is SHIPPED
+     * - Prevent duplicate deliver action
+     * - Move status to DELIVERED
+     * - Store deliveredAt audit timestamp
+     */
+    @Override
+    public void deliverOrder(Long orderId) {
+        log.info("order.lifecycle.deliver.start orderId={}", orderId);
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException("Order not found"));
+
+        if (order.getStatus() == OrderStatus.DELIVERED) {
+            throw new OrderAlreadyDeliveredException("Order is already delivered.");
+        }
+
+        if (order.getStatus() != OrderStatus.SHIPPED) {
+            throw new OrderTransitionNotAllowedException("Cannot deliver order. Order must be in SHIPPED state.");
+        }
+
+        order.setStatus(OrderStatus.DELIVERED);
+        order.setDeliveredAt(LocalDateTime.now());
+        orderRepository.save(order);
+        log.info("order.lifecycle.deliver.success orderId={} newStatus=DELIVERED", orderId);
+    }
+
+    /*
+     * This method handles cancellation by the order owner (user flow).
+     *
+     * Responsibilities:
+     * - Fetch order and validate ownership
+     * - Block cancellation for delivered orders
+     * - Block duplicate cancellation
+     * - Apply cancellation status and timestamp
+     */
+    @Override
+    public void cancelOrder(Long orderId, Long userId) {
+        log.info("order.cancel.user.start orderId={} userId={}", orderId, userId);
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException("Order not found"));
+
+        if (!order.getUserId().equals(userId)) {
+            log.warn("order.cancel.user.unauthorized orderId={} requestedBy={} owner={}",
+                    orderId, userId, order.getUserId());
+            throw new UnauthorizedException("You are not allowed to cancel this order");
+        }
+
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            throw new OrderAlreadyCancelledException("Order is already cancelled.");
+        }
+
+        if (order.getStatus() == OrderStatus.DELIVERED) {
+            throw new OrderCancellationNotAllowedException("Cannot cancel order. Order is already delivered.");
+        }
+
+        applyCancellation(order);
+    }
+
+    /*
+     * This method handles cancellation by admin.
+     *
+     * Responsibilities:
+     * - Fetch order without ownership restriction
+     * - Block cancellation for delivered orders
+     * - Block duplicate cancellation
+     * - Apply cancellation status and timestamp
+     */
+    @Override
+    public void cancelOrderAsAdmin(Long orderId) {
+        log.info("order.cancel.admin.start orderId={}", orderId);
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException("Order not found"));
+
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            throw new OrderAlreadyCancelledException("Order is already cancelled.");
+        }
+
+        if (order.getStatus() == OrderStatus.DELIVERED) {
+            throw new OrderCancellationNotAllowedException("Cannot cancel order. Order is already delivered.");
+        }
+
+        applyCancellation(order);
+    }
+
+    // =============================
+    // Internal service-to-service APIs
+    // =============================
 
     /*
      * This method is used to update the status of an existing order.
@@ -149,101 +328,53 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public void updateOrderStatus(Long orderId, OrderStatus status) {
+        log.info("order.status.update.start orderId={} targetStatus={}", orderId, status);
 
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException("Order not found"));
+        OrderStatus previousStatus = order.getStatus();
+
+        // Reduce inventory only once when payment is confirmed.
+        if (status == OrderStatus.PAID && order.getStatus() != OrderStatus.PAID) {
+            reduceStockForOrder(order);
+        }
 
         order.setStatus(status);
         orderRepository.save(order);
+        log.info("order.status.update.success orderId={} previousStatus={} newStatus={}", orderId, previousStatus, status);
     }
 
     /*
-     * This method is responsible for finalizing an order after successful payment.
-     *
-     * It acts as the final confirmation step in the order lifecycle.
-     * The order can only be placed if the payment has been completed successfully.
-     *
-     * Responsibilities:
-     * - Fetch the order using orderId
-     * - Verify that the requesting user is authorized (matches userId)
-     * - Ensure that the order status is PAID before allowing placement
-     * - Update the order status to PACKED/PLACED (based on design)
-     * - Set the placedAt timestamp to mark order confirmation
-     * - Save the updated order in the database
-     *
-     * Important Notes:
-     * - Prevents users from placing unpaid orders (critical business rule)
-     * - Marks the transition from payment stage to fulfillment stage
-     * - This is where post-order processes can be triggered (e.g., inventory, notifications)
+     * Helper method:
+     * Applies common cancellation updates on the order.
      */
-    @Override
-    public void placeOrder(Long orderId) {
-
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new OrderNotFoundException("Order not found"));
-
-        if (order.getStatus() == OrderStatus.PACKED) {
-            throw new OrderAlreadyPackedException("Order is already packed and ready to ship.");
-        }
-
-        if (order.getStatus() != OrderStatus.PAID) {
-            throw new OrderTransitionNotAllowedException("Cannot pack order. Order must be in PAID state.");
-        }
-
-        order.setStatus(OrderStatus.PACKED); // or PLACED if you add it
-        order.setCreatedAt(LocalDateTime.now());
-
+    private void applyCancellation(Order order) {
+        log.info("order.cancel.apply.start orderId={}", order.getId());
+        order.setStatus(OrderStatus.CANCELLED);
+        order.setCancelledAt(LocalDateTime.now());
         orderRepository.save(order);
+        log.info("order.cancel.apply.success orderId={} newStatus=CANCELLED", order.getId());
+    }
+
+    private void reduceStockForOrder(Order order) {
+        if (order.getItems() == null || order.getItems().isEmpty()) {
+            log.warn("order.stock_reduce.skipped orderId={} reason=no_items", order.getId());
+            return;
+        }
+
+        for (var item : order.getItems()) {
+            log.info("order.stock_reduce.item orderId={} productId={} quantity={}",
+                    order.getId(),
+                    item.getProductId(), item.getQuantity(), order.getId());
+            catalogClient.reduceStock(item.getProductId(), item.getQuantity());
+        }
+        log.info("order.stock_reduce.success orderId={}", order.getId());
     }
 
     /*
-     * This method is used to mark a packed order as shipped.
-     *
-     * It is primarily called when logistics handover is completed.
+     * Helper method:
+     * Get raw order entity by id for internal service use.
      */
-    @Override
-    public void shipOrder(Long orderId) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new OrderNotFoundException("Order not found"));
-
-        if (order.getStatus() == OrderStatus.SHIPPED) {
-            throw new OrderAlreadyShippedException("Order is already shipped.");
-        }
-
-        if (order.getStatus() == OrderStatus.DELIVERED) {
-            throw new OrderAlreadyDeliveredException("Order is already delivered.");
-        }
-
-        if (order.getStatus() != OrderStatus.PACKED) {
-            throw new OrderTransitionNotAllowedException("Cannot ship order. Order must be in PACKED state.");
-        }
-
-        order.setStatus(OrderStatus.SHIPPED);
-        orderRepository.save(order);
-    }
-
-    /*
-     * This method is used to mark a shipped order as delivered.
-     *
-     * It is primarily called when delivery is successfully completed.
-     */
-    @Override
-    public void deliverOrder(Long orderId) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new OrderNotFoundException("Order not found"));
-
-        if (order.getStatus() == OrderStatus.DELIVERED) {
-            throw new OrderAlreadyDeliveredException("Order is already delivered.");
-        }
-
-        if (order.getStatus() != OrderStatus.SHIPPED) {
-            throw new OrderTransitionNotAllowedException("Cannot deliver order. Order must be in SHIPPED state.");
-        }
-
-        order.setStatus(OrderStatus.DELIVERED);
-        orderRepository.save(order);
-    }
-
     @Override
     public Order getOrderById(Long orderId) {
         return orderRepository.findById(orderId)
@@ -261,6 +392,7 @@ public class OrderServiceImpl implements OrderService {
      */
     @Override
     public PaymentResponseDto startPayment(Long orderId, Long userId) {
+        log.info("order.payment.start orderId={} userId={}", orderId, userId);
 
         // Step 1: Fetch order
         Order order = orderRepository.findById(orderId)
@@ -268,16 +400,21 @@ public class OrderServiceImpl implements OrderService {
 
         // Step 2: Authorization check
         if (!order.getUserId().equals(userId)) {
+            log.warn("order.payment.unauthorized orderId={} requestedBy={} owner={}",
+                    orderId, userId, order.getUserId());
             throw new UnauthorizedException("You are not allowed to initiate payment for this order");
         }
 
         // Step 3: Payment can start only from CHECKOUT.
         if (order.getStatus() != OrderStatus.CHECKOUT) {
+            log.warn("order.payment.blocked orderId={} currentStatus={}", orderId, order.getStatus());
             throw new InvalidOrderStateException("Order is not in CHECKOUT state");
         }
 
         // Step 4: Call Payment Service
-        return paymentClient.createPayment(buildPaymentRequest(order));
+        PaymentResponseDto response = paymentClient.createPayment(buildPaymentRequest(order));
+        log.info("order.payment.request_sent orderId={}", orderId);
+        return response;
     }
 
     /*
@@ -322,6 +459,10 @@ public class OrderServiceImpl implements OrderService {
                 .status(order.getStatus())
                 .totalAmount(order.getTotalAmount())
                 .createdAt(order.getCreatedAt())
+                .packedAt(order.getPackedAt())
+                .shippedAt(order.getShippedAt())
+                .deliveredAt(order.getDeliveredAt())
+                .cancelledAt(order.getCancelledAt())
                 .address(addressDto)
                 .items(items)
                 .build();

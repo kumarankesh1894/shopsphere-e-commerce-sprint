@@ -33,6 +33,10 @@ public class ProductServiceImpl implements ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final ModelMapper modelMapper;
+
+    // =============================
+    // User APIs
+    // =============================
     /*
     * Cacheable means: Store + fetch cache
     * @Cacheable stores method results in cache using a unique key
@@ -66,6 +70,10 @@ public class ProductServiceImpl implements ProductService {
 
         return response;
     }
+
+    // =============================
+    // Admin APIs
+    // =============================
 
     //Create the product with validation of category and mapping DTO to Entity
     @CacheEvict(value = {"productsList", "productSearch"}, allEntries = true)
@@ -257,6 +265,10 @@ public class ProductServiceImpl implements ProductService {
 
         return modelMapper.map(savedProduct, ProductResponse.class);
     }
+
+    // =============================
+    // Internal service-to-service APIs
+    // =============================
 
     /*
     * logic to reduce stock of a product, which is crucial for inventory management in an e-commerce application.
