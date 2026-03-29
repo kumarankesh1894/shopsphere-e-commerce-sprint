@@ -63,6 +63,12 @@ public class OrderInternalController {
      */
     @Operation(summary = "Update order status", description = "Internal endpoint to update order lifecycle status")
     @PutMapping("/{orderId}/status")
+    /*
+     * RabbitMQ note:
+     * Most status changes come asynchronously from payment events consumed by the listener.
+     * This endpoint is the synchronous internal path for trusted services or fallback/manual updates.
+     * Both paths use the same service method so status transition rules stay in one place.
+     */
     public ResponseEntity<Void> updateStatus(
             @PathVariable("orderId") Long orderId,
             @RequestParam("status") OrderStatus status

@@ -23,13 +23,11 @@ spring:
     redis:
       host: localhost
       port: 6379
-
-
-#  rabbitmq:
-#    host: localhost
-#    port: 5672
-#    username: guest
-#    password: guest
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
 
 eureka:            #eureka is at root level, not under spring
   client:

@@ -22,6 +22,11 @@ spring:
     user:
       name: ""
       password: ""
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
 
 eureka:            #eureka is at root level, not under spring
   client:
