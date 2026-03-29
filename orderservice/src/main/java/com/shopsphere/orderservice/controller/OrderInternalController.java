@@ -1,5 +1,7 @@
 package com.shopsphere.orderservice.controller;
 
+import com.shopsphere.orderservice.dto.OrderPaymentDto;
+import com.shopsphere.orderservice.entity.Order;
 import com.shopsphere.orderservice.enums.OrderStatus;
 import com.shopsphere.orderservice.service.OrderService;
 import lombok.RequiredArgsConstructor;
@@ -37,10 +39,27 @@ public class OrderInternalController {
 
     @PutMapping("/{orderId}/status")
     public ResponseEntity<Void> updateStatus(
-            @PathVariable Long orderId,
-            @RequestParam OrderStatus status
+            @PathVariable("orderId") Long orderId,
+            @RequestParam("status") OrderStatus status
     ) {
         orderService.updateOrderStatus(orderId, status);
         return ResponseEntity.ok().build();
     }
+
+    @GetMapping("/{orderId}")
+    public ResponseEntity<OrderPaymentDto> getOrderForPayment(
+            @PathVariable("orderId") Long orderId) {
+
+        Order order = orderService.getOrderById(orderId);
+
+        OrderPaymentDto dto = OrderPaymentDto.builder()
+                .id(order.getId())
+                .userId(order.getUserId())
+                .totalAmount(order.getTotalAmount())
+                .build();
+
+        return ResponseEntity.ok(dto);
+    }
+
+
 }

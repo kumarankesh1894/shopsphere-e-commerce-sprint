@@ -13,7 +13,7 @@ public enum OrderStatus {
     CHECKOUT,
     PAYMENT_PENDING,    // Payment started
     PAID,               // Payment successful
-    FAILED,
+    PAYMENT_FAILED,
     PACKED,
     SHIPPED,
     DELIVERED,

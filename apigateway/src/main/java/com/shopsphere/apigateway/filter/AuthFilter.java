@@ -56,8 +56,11 @@ public class AuthFilter implements GlobalFilter, Ordered{
 
             // step 4: Role-Based Authorization
 
+            boolean isAdminOrderLifecycleRoute = path.matches("^/api/orders/private/\\d+/(place|ship|deliver)$");
+
             boolean isAdminRoute = path.startsWith("/api/admin")
-                    || path.startsWith("/api/catalog/private");
+                    || path.startsWith("/api/catalog/private")
+                    || isAdminOrderLifecycleRoute;
 
             boolean isUserRoute = path.startsWith("/api/user");
 

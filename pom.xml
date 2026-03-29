@@ -16,6 +16,7 @@
         <module>apigateway</module>
         <module>eurekaserver</module>
         <module>orderservice</module>
+        <module>paymentservice</module>
 
     </modules>
 
