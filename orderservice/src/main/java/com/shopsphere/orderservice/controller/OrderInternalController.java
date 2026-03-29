@@ -1,5 +1,6 @@
 package com.shopsphere.orderservice.controller;
 
+import com.shopsphere.orderservice.dto.OrderAdminDto;
 import com.shopsphere.orderservice.dto.OrderPaymentDto;
 import com.shopsphere.orderservice.entity.Order;
 import com.shopsphere.orderservice.enums.OrderStatus;
@@ -9,6 +10,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
+import java.util.List;
 
 /*
  * Internal controller for inter-service communication within the system.
@@ -39,6 +43,10 @@ import org.springframework.web.bind.annotation.*;
 public class OrderInternalController {
 
     private final OrderService orderService;
+
+    // =============================
+    // Internal APIs for Payment Flow
+    // =============================
 
     /*
      * What:
@@ -90,6 +98,44 @@ public class OrderInternalController {
                 .build();
 
         return ResponseEntity.ok(dto);
+    }
+
+    // =============================
+    // Internal APIs for Admin Reporting Flow
+    // =============================
+
+    @Operation(summary = "Get all orders for admin", description = "Internal endpoint used by admin service to read all orders for dashboard and reports")
+    @GetMapping("/admin")
+    /*
+     * What:
+     * Returns all orders in admin-friendly DTO format.
+     *
+     * Why:
+     * Adminservice needs full order list to build dashboard and management views.
+     *
+     * How:
+     * Delegates to orderService.getAllOrdersForAdmin() and returns 200 response.
+     */
+    public ResponseEntity<List<OrderAdminDto>> getAllOrdersForAdmin() {
+        return ResponseEntity.ok(orderService.getAllOrdersForAdmin());
+    }
+
+    @Operation(summary = "Get orders by date range for admin", description = "Internal endpoint used by admin service to read orders between two dates")
+    @GetMapping("/admin/report")
+    /*
+     * What:
+     * Returns orders inside the provided date range.
+     *
+     * Why:
+     * Adminservice uses this data to build sales/products/customers reports.
+     *
+     * How:
+     * Reads start/end query params and delegates to orderService.getOrdersByDateRange(...).
+     */
+    public ResponseEntity<List<OrderAdminDto>> getOrdersByDateRange(
+            @RequestParam("start") LocalDate start,
+            @RequestParam("end") LocalDate end) {
+        return ResponseEntity.ok(orderService.getOrdersByDateRange(start, end));
     }
 
 

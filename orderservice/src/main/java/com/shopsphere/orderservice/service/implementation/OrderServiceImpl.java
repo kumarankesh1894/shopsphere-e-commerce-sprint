@@ -3,6 +3,8 @@ package com.shopsphere.orderservice.service.implementation;
 import com.shopsphere.orderservice.client.CatalogServiceClient;
 import com.shopsphere.orderservice.client.PaymentClient;
 import com.shopsphere.orderservice.dto.AddressDto;
+import com.shopsphere.orderservice.dto.OrderAdminDto;
+import com.shopsphere.orderservice.dto.OrderAdminItemDto;
 import com.shopsphere.orderservice.dto.OrderHistoryPageDto;
 import com.shopsphere.orderservice.dto.OrderItemResponseDto;
 import com.shopsphere.orderservice.dto.OrderResponseDto;
@@ -31,7 +33,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -393,6 +397,48 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new OrderNotFoundException("Order not found"));
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    /*
+     * What:
+     * Fetches all orders for admin internal use.
+     *
+     * Why:
+     * Adminservice needs complete order data for dashboard and order listing.
+     *
+     * How:
+     * Query all orders in latest-first order and map each entity to OrderAdminDto.
+     */
+    public List<OrderAdminDto> getAllOrdersForAdmin() {
+        log.info("order.admin.fetch_all.start");
+        return orderRepository.findAllByOrderByCreatedAtDesc().stream()
+                .map(this::mapToOrderAdminDto)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    /*
+     * What:
+     * Fetches orders inside a date range for admin reports.
+     *
+     * Why:
+     * Reports APIs require time-bounded data (sales/products/customers).
+     *
+     * How:
+     * 1) Convert LocalDate range to full-day LocalDateTime range.
+     * 2) Query repository by createdAt range.
+     * 3) Map results to OrderAdminDto list.
+     */
+    public List<OrderAdminDto> getOrdersByDateRange(LocalDate start, LocalDate end) {
+        LocalDateTime from = start.atStartOfDay();
+        LocalDateTime to = end.plusDays(1).atStartOfDay().minusNanos(1);
+        log.info("order.admin.fetch_range.start start={} end={}", start, end);
+        return orderRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(from, to).stream()
+                .map(this::mapToOrderAdminDto)
+                .toList();
+    }
+
     /*
      * Checkout logic implementation
      *
@@ -448,6 +494,39 @@ public class OrderServiceImpl implements OrderService {
         dto.setIdempotencyKey(order.getId() + "_" + System.currentTimeMillis());
 
         return dto;
+    }
+
+    /*
+     * What:
+     * Maps Order entity into admin reporting DTO.
+     *
+     * Why:
+     * Adminservice should receive only required fields in a stable transport shape.
+     *
+     * How:
+     * Map order-level fields and convert order items to OrderAdminItemDto list.
+     */
+    private OrderAdminDto mapToOrderAdminDto(Order order) {
+        List<OrderAdminItemDto> items = order.getItems() == null
+                ? List.of()
+                : order.getItems().stream()
+                .map(item -> OrderAdminItemDto.builder()
+                        .productId(item.getProductId())
+                        .productName(item.getProductName())
+                        .quantity(item.getQuantity())
+                        .price(item.getPrice())
+                        .build())
+                .toList();
+
+        return OrderAdminDto.builder()
+                .orderId(order.getId())
+                .userId(order.getUserId())
+                .userName(order.getDeliveryAddress() != null ? order.getDeliveryAddress().getFullName() : null)
+                .totalAmount(order.getTotalAmount())
+                .status(order.getStatus())
+                .placedAt(order.getCreatedAt())
+                .items(items)
+                .build();
     }
 
     private OrderResponseDto mapToOrderResponse(Order order) {
