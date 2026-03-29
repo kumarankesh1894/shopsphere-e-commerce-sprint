@@ -4,6 +4,8 @@ import com.shopsphere.orderservice.dto.OrderPaymentDto;
 import com.shopsphere.orderservice.entity.Order;
 import com.shopsphere.orderservice.enums.OrderStatus;
 import com.shopsphere.orderservice.service.OrderService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -30,6 +32,7 @@ import org.springframework.web.bind.annotation.*;
  * Usage:
  * - Called by Payment Service via Feign client after processing payments
  */
+@Tag(name = "Order Internal APIs", description = "Internal service-to-service order endpoints")
 @RestController
 @RequestMapping("/api/orders/internal")
 @RequiredArgsConstructor
@@ -50,6 +53,7 @@ public class OrderInternalController {
      * 2) Delegates transition logic to orderService.updateOrderStatus(...).
      * 3) Returns empty 200 response on success.
      */
+    @Operation(summary = "Update order status", description = "Internal endpoint to update order lifecycle status")
     @PutMapping("/{orderId}/status")
     public ResponseEntity<Void> updateStatus(
             @PathVariable("orderId") Long orderId,
@@ -72,6 +76,7 @@ public class OrderInternalController {
      * 2) Maps required fields into OrderPaymentDto.
      * 3) Returns lightweight DTO for service-to-service use.
      */
+    @Operation(summary = "Get order payment details", description = "Internal endpoint returning minimal order details required by payment service")
     @GetMapping("/{orderId}")
     public ResponseEntity<OrderPaymentDto> getOrderForPayment(
             @PathVariable("orderId") Long orderId) {

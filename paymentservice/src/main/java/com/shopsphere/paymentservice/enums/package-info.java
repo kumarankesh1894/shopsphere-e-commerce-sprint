@@ -3,6 +3,7 @@
  *
  * What it does:
  * - Defines payment state, order state, and gateway type constants.
+ * - Provides typed status mapping between payment and order lifecycle.
  *
  * Why it exists:
  * - Prevents invalid string values.
@@ -13,5 +14,9 @@
  * - PaymentServiceImpl.verifyPayment(...)
  * - PaymentServiceImpl.syncOrderStatus(...)
  * - PaymentServiceImpl.safeUpdateOrderStatus(...)
+ *
+ * New implementation notes:
+ * - Enums are central to success/failed/payment-pending transitions.
+ * - Internal status sync calls rely on enum-safe request values.
  */
 package com.shopsphere.paymentservice.enums;

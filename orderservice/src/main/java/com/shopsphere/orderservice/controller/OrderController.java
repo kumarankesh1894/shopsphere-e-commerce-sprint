@@ -6,6 +6,8 @@ import com.shopsphere.orderservice.dto.OrderResponseDto;
 import com.shopsphere.orderservice.dto.PaymentResponseDto;
 import com.shopsphere.orderservice.exception.UnauthorizedException;
 import com.shopsphere.orderservice.service.OrderService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
  *
  * All APIs expect identity/role headers forwarded by API Gateway.
  */
+@Tag(name = "Order APIs", description = "Operations for order history, details, payment start, cancellation, and admin lifecycle")
 @RestController
 @RequestMapping("/api/orders/private")
 @RequiredArgsConstructor
@@ -47,6 +50,7 @@ public class OrderController {
      * 2) Delegates data fetch + filtering to orderService.getMyOrders(...).
      * 3) Wraps result in ApiResponse with pagination metadata.
      */
+    @Operation(summary = "Get my orders", description = "Returns paginated order history for the logged-in user")
     @GetMapping("/myorders")
     public ResponseEntity<ApiResponse<OrderHistoryPageDto>> getMyOrders(
             @RequestHeader("X-UserId") Long userId,
@@ -70,6 +74,7 @@ public class OrderController {
      * 2) Delegates ownership check + fetch to orderService.getOrder(...).
      * 3) Returns mapped DTO in standard ApiResponse.
      */
+    @Operation(summary = "Get order by ID", description = "Returns one order detail for the logged-in user")
     @GetMapping("/{orderId}")
     public ResponseEntity<ApiResponse<OrderResponseDto>> getOrder(
             @PathVariable Long orderId,
@@ -98,6 +103,7 @@ public class OrderController {
      * 2) Delegates validation + payment request creation to orderService.startPayment(...).
      * 3) Returns payment initiation payload to caller.
      */
+    @Operation(summary = "Start payment", description = "Initiates payment flow for a checkout order")
     @PostMapping("/{orderId}/pay")
     public ResponseEntity<ApiResponse<PaymentResponseDto>> startPayment(
             @PathVariable Long orderId,
@@ -120,6 +126,7 @@ public class OrderController {
      * 2) Executes admin or user cancellation branch based on role.
      * 3) Returns cancelled orderId in success response.
      */
+    @Operation(summary = "Cancel order", description = "Cancels an order as user or admin based on role header")
     @PostMapping("/{orderId}/cancel")
     public ResponseEntity<ApiResponse<Long>> cancelOrder(
             @PathVariable Long orderId,
@@ -150,6 +157,7 @@ public class OrderController {
      * 2) Delegates lifecycle transition to orderService.placeOrder(...).
      * 3) Returns orderId with packed confirmation message.
      */
+    @Operation(summary = "Pack order", description = "Admin marks a PAID order as PACKED")
     @PostMapping("/{orderId}/place")
     public ResponseEntity<ApiResponse<Long>> placeOrder(
             @PathVariable Long orderId,
@@ -172,6 +180,7 @@ public class OrderController {
      * 2) Calls orderService.shipOrder(...) for transition checks + persistence.
      * 3) Returns success response with orderId.
      */
+    @Operation(summary = "Ship order", description = "Admin marks a PACKED order as SHIPPED")
     @PostMapping("/{orderId}/ship")
     public ResponseEntity<ApiResponse<Long>> shipOrder(
             @PathVariable Long orderId,
@@ -194,6 +203,7 @@ public class OrderController {
      * 2) Delegates transition to orderService.deliverOrder(...).
      * 3) Returns orderId with delivered message.
      */
+    @Operation(summary = "Deliver order", description = "Admin marks a SHIPPED order as DELIVERED")
     @PostMapping("/{orderId}/deliver")
     public ResponseEntity<ApiResponse<Long>> deliverOrder(
             @PathVariable Long orderId,

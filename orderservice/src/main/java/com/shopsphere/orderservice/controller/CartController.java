@@ -4,11 +4,14 @@ import com.shopsphere.orderservice.dto.ApiResponse;
 import com.shopsphere.orderservice.dto.CartItemRequestDto;
 import com.shopsphere.orderservice.dto.CartResponseDto;
 import com.shopsphere.orderservice.service.CartService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+@Tag(name = "Cart APIs", description = "Operations for managing user cart")
 @RestController
 @RequestMapping("/api/cart/private")
 @RequiredArgsConstructor
@@ -28,6 +31,7 @@ public class CartController {
      * 2) Validates and forwards item payload to cartService.addToCart(...).
      * 3) Returns updated cart snapshot.
      */
+      @Operation(summary = "Add item to cart", description = "Adds a product and quantity to the logged-in user's cart")
     @PostMapping("/items")
     public ResponseEntity<ApiResponse<CartResponseDto>> addToCart(
             @RequestHeader("X-UserId") Long userId,
@@ -52,6 +56,7 @@ public class CartController {
      * 2) Delegates retrieval to cartService.getCart(...).
      * 3) Wraps cart DTO in ApiResponse.
      */
+      @Operation(summary = "Get cart", description = "Returns the current cart details for the logged-in user")
     @GetMapping
     public ResponseEntity<ApiResponse<CartResponseDto>> getCart(
             @RequestHeader("X-UserId") Long userId
@@ -75,6 +80,7 @@ public class CartController {
      * 2) Delegates update validation + persistence to cartService.updateItem(...).
      * 3) Returns refreshed cart state.
      */
+      @Operation(summary = "Update cart item", description = "Updates quantity of an existing product in the cart")
     @PutMapping("/items/{productId}")
     public ResponseEntity<ApiResponse<CartResponseDto>> updateCartItem(
             @RequestHeader("X-UserId") Long userId,
@@ -100,6 +106,7 @@ public class CartController {
      * 2) Delegates removal to cartService.removeItem(...).
      * 3) Returns updated cart details.
      */
+      @Operation(summary = "Remove item from cart", description = "Removes one product from the logged-in user's cart")
     @DeleteMapping("/items/{productId}")
     public ResponseEntity<ApiResponse<CartResponseDto>> removeItem(
             @RequestHeader("X-UserId") Long userId,
@@ -124,6 +131,7 @@ public class CartController {
      * 2) Calls cartService.clearCart(...).
      * 3) Returns success confirmation message.
      */
+      @Operation(summary = "Clear cart", description = "Removes all items from the logged-in user's cart")
     @DeleteMapping("/clear")
     public ResponseEntity<ApiResponse<String>> clearCart(
             @RequestHeader("X-UserId") Long userId

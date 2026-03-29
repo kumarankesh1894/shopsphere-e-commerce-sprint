@@ -3,6 +3,8 @@ package com.shopsphere.paymentservice.controller;
 import com.shopsphere.paymentservice.dto.PaymentRequestDto;
 import com.shopsphere.paymentservice.dto.PaymentResponseDto;
 import com.shopsphere.paymentservice.dto.PaymentVerificationRequestDto;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import com.shopsphere.paymentservice.service.PaymentService;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "Payment APIs", description = "Internal payment creation and verification operations")
 @RestController
 @RequestMapping("/api/payments/internal")
 @RequiredArgsConstructor
@@ -39,6 +42,7 @@ public class PaymentController {
      * 3) Delegates business logic to paymentService.createPayment(...).
      * 4) Returns payment initiation details (gateway order id, key id, status).
      */
+    @Operation(summary = "Create payment", description = "Creates a payment entry and gateway order for the requested order")
     @PostMapping
     public ResponseEntity<PaymentResponseDto> createPayment(
             @Valid @RequestBody PaymentRequestDto request) {
@@ -63,6 +67,7 @@ public class PaymentController {
      * 3) Delegates verification to paymentService.verifyPayment(...).
      * 4) Returns updated payment state after verification logic.
      */
+    @Operation(summary = "Verify payment", description = "Verifies gateway signature and updates final payment status")
     @PostMapping("/verify")
     public ResponseEntity<PaymentResponseDto> verifyPayment(
             @Valid @RequestBody PaymentVerificationRequestDto request) {
@@ -70,6 +75,7 @@ public class PaymentController {
 
         return ResponseEntity.ok(paymentService.verifyPayment(request));
     }
+
 
     // =============================
     // Admin APIs
