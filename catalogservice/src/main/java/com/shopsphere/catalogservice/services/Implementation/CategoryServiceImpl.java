@@ -53,6 +53,11 @@ public class CategoryServiceImpl implements CategoryService {
         // Log the creation attempt with category name for better traceability
         log.info("Creating category with name: {}", categoryRequest.getName());
 
+        if (categoryRepository.existsByCategoryNameIgnoreCase(categoryRequest.getName())) {
+            log.warn("Category already exists with name: {}", categoryRequest.getName());
+            throw new IllegalArgumentException("Category already exists with name: " + categoryRequest.getName());
+        }
+
         Category category  = modelMapper.map(categoryRequest, Category.class);
 
         Category savedCategory = categoryRepository.save(category);
@@ -72,6 +77,14 @@ public class CategoryServiceImpl implements CategoryService {
                 .orElseThrow(() -> {
                     log.warn("Category not found for update with id: {}", id);
                     return new CategoryNotFoundException("Category not found with id: " + id);
+                });
+
+        categoryRepository.findByCategoryNameIgnoreCase(categoryRequest.getName())
+                .ifPresent(existing -> {
+                    if (!existing.getCategoryId().equals(id)) {
+                        log.warn("Category name already in use: {}", categoryRequest.getName());
+                        throw new IllegalArgumentException("Category already exists with name: " + categoryRequest.getName());
+                    }
                 });
 
         modelMapper.map(categoryRequest, category);

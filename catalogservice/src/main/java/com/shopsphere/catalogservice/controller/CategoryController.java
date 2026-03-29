@@ -9,6 +9,7 @@ import com.shopsphere.catalogservice.services.CategoryService;
 import com.shopsphere.catalogservice.services.HomepageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -92,7 +93,7 @@ public class CategoryController {
     @Operation(summary = "Create category", description = "Admin creates a new category")
     @PostMapping("/private")
     public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(
-            @RequestBody CategoryRequest request) {
+            @Valid @RequestBody CategoryRequest request) {
 
         CategoryResponse response = categoryService.createCategory(request);
 
@@ -116,7 +117,7 @@ public class CategoryController {
     @PutMapping("/private/{id}")
     public ResponseEntity<ApiResponse<CategoryResponse>> updateCategory(
             @PathVariable Long id,
-            @RequestBody CategoryRequest request) {
+            @Valid @RequestBody CategoryRequest request) {
 
         CategoryResponse updated = categoryService.updateCategory(id, request);
 

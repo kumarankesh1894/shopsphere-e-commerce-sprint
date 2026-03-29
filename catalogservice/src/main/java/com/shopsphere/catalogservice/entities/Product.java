@@ -36,7 +36,7 @@ public class Product {
 
         // Featured products are highlighted on the homepage and category pages
         @Column(nullable = false)
-        private Boolean featured;
+        private Boolean featured = false;
 
     // Many products → one category
     @ManyToOne(fetch = FetchType.LAZY)

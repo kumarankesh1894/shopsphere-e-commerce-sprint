@@ -2,6 +2,7 @@ package com.shopsphere.catalogservice.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -74,6 +75,20 @@ public class GlobalExceptionHandler {
                 "INVALID_REQUEST",
                 ex.getMessage(),
                 HttpStatus.BAD_REQUEST,
+                request);
+    }
+
+    // Database constraint violation (duplicate keys / non-null columns)
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<?> handleDataIntegrity(DataIntegrityViolationException ex, HttpServletRequest request) {
+
+        String message = ex.getMostSpecificCause().getMessage();
+        log.warn("Data integrity violation at {}: {}", request.getRequestURI(), message);
+
+        return buildResponse(
+                "DATA_INTEGRITY_VIOLATION",
+                message,
+                HttpStatus.CONFLICT,
                 request);
     }
 

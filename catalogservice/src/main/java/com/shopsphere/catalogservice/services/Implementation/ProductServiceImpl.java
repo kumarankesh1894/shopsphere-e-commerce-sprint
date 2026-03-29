@@ -89,12 +89,17 @@ public class ProductServiceImpl implements ProductService {
                     return new CategoryNotFoundException("Category not found");
                 });
 
-        //  Map DTO → Entity
-        Product product = modelMapper.map(productRequest, Product.class);
+        // Create a fresh entity and map only product fields (not ids)
+        Product product = new Product();
+        applyProductRequest(productRequest, product);
 
         // Set relationship manually
         product.setCategory(category);  //means hey product belongs to this category
         product.setIsAvailable(true); // Default to available when creating
+        product.setProductId(null); // Ensure INSERT, never accidental UPDATE
+        if (product.getFeatured() == null) {
+            product.setFeatured(false);
+        }
 
         Product savedProduct = productRepository.save(product);
         log.info("Product created successfully with id: {}", savedProduct.getProductId());
@@ -120,9 +125,12 @@ public class ProductServiceImpl implements ProductService {
                     log.warn("Category not found with id in Product updation: {}", productRequest.getCategoryId());
                     return new CategoryNotFoundException("Category not found");
                 });
-        // Update fields
-        modelMapper.map(productRequest, product);
+        // Update mutable product fields only (avoid touching primary key)
+        applyProductRequest(productRequest, product);
         product.setCategory(category);
+        if (product.getFeatured() == null) {
+            product.setFeatured(false);
+        }
 
         Product updatedProduct = productRepository.save(product);
 
@@ -297,6 +305,14 @@ public class ProductServiceImpl implements ProductService {
         productRepository.save(product);
 
         log.info("Stock reduced successfully for productId: {}", productId);
+    }
+
+    private void applyProductRequest(ProductRequest source, Product target) {
+        target.setProductName(source.getProductName());
+        target.setProductDescription(source.getProductDescription());
+        target.setPrice(source.getPrice());
+        target.setStock(source.getStock());
+        target.setImageUrl(source.getImageUrl());
     }
 
 }
