@@ -10,6 +10,16 @@
     <version>1.0.0</version>
     <packaging>pom</packaging>
 
+    <properties>
+        <!-- SonarQube placeholders: provide real values via CI or CLI -->
+        <sonar.projectKey>your_project_key</sonar.projectKey>
+        <sonar.host.url>http://your-sonarqube-host:9000</sonar.host.url>
+        <sonar.login>your_sonar_token</sonar.login>
+
+        <!-- Java analysis level -->
+        <sonar.java.source>17</sonar.java.source>
+    </properties>
+
     <modules>
         <module>authservice</module>
         <module>catalogservice</module>
@@ -20,5 +30,15 @@
         <module>adminservice</module>
 
     </modules>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.sonarsource.scanner.maven</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>3.11.0.3922</version>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>

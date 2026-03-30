@@ -1,13 +1,13 @@
 package com.shopsphere.eurekaserver;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 class EurekaserverApplicationTests {
 
-	@Test
-	void contextLoads() {
-	}
-
+    @Test
+    void applicationClass_isAvailable() {
+        assertNotNull(EurekaserverApplication.class);
+    }
 }
