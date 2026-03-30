@@ -140,6 +140,20 @@ class AdminReportServiceImplTest {
         assertEquals(new BigDecimal("100.00"), response.get(1).getRevenue());
     }
 
+    @Test
+    void getOrders_delegatesToOrderClient() {
+        OrderAdminDto order = buildOrder(99L, 1L, "Demo", "PAID", "2026-03-20T10:00:00",
+                new BigDecimal("500.00"), List.of());
+
+        when(orderClient.getAllOrders()).thenReturn(List.of(order));
+
+        List<OrderAdminDto> response = adminReportService.getOrders();
+
+        assertEquals(1, response.size());
+        assertEquals(99L, response.get(0).getOrderId());
+        verify(orderClient).getAllOrders();
+    }
+
     private OrderAdminDto buildOrder(Long orderId,
                                      Long userId,
                                      String userName,

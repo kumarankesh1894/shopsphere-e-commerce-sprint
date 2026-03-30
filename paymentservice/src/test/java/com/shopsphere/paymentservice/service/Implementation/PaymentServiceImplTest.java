@@ -1,6 +1,7 @@
 package com.shopsphere.paymentservice.service.Implementation;
 
 import com.shopsphere.paymentservice.client.OrderClient;
+import com.shopsphere.paymentservice.dto.OrderResponseDto;
 import com.shopsphere.paymentservice.dto.OrderStatusUpdateEvent;
 import com.shopsphere.paymentservice.dto.PaymentRequestDto;
 import com.shopsphere.paymentservice.dto.PaymentResponseDto;
@@ -10,6 +11,7 @@ import com.shopsphere.paymentservice.enums.Gateway;
 import com.shopsphere.paymentservice.enums.OrderStatus;
 import com.shopsphere.paymentservice.enums.PaymentStatus;
 import com.shopsphere.paymentservice.exception.PaymentException;
+import com.shopsphere.paymentservice.exception.PaymentVerificationException;
 import com.shopsphere.paymentservice.messaging.OrderStatusEventPublisher;
 import com.shopsphere.paymentservice.repository.PaymentRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,6 +67,15 @@ class PaymentServiceImplTest {
     }
 
     @Test
+    void createPayment_whenIdempotencyKeyMissing_throwsPaymentException() {
+        PaymentRequestDto request = new PaymentRequestDto();
+        request.setOrderId(1L);
+        request.setIdempotencyKey("  ");
+
+        assertThrows(PaymentException.class, () -> paymentService.createPayment(request));
+    }
+
+    @Test
     void createPayment_whenExistingProcessingPayment_reusesAndPublishesPending() {
         PaymentRequestDto request = new PaymentRequestDto();
         request.setOrderId(3L);
@@ -98,6 +109,49 @@ class PaymentServiceImplTest {
     }
 
     @Test
+    void createPayment_whenExistingByIdempotencyKey_reusesLatest() {
+        PaymentRequestDto request = new PaymentRequestDto();
+        request.setOrderId(99L);
+        request.setIdempotencyKey("same-key");
+
+        Payment byKey = Payment.builder()
+                .orderId(42L)
+                .status(PaymentStatus.FAILED)
+                .idempotencyKey("same-key")
+                .gateway(Gateway.RAZORPAY)
+                .currency("INR")
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        PaymentResponseDto dto = new PaymentResponseDto();
+        dto.setOrderId(42L);
+        dto.setPaymentStatus("FAILED");
+
+        when(paymentRepository.findAllByOrderIdOrderByCreatedAtDescIdDesc(99L)).thenReturn(List.of());
+        when(paymentRepository.findAllByIdempotencyKeyOrderByCreatedAtDescIdDesc("same-key")).thenReturn(List.of(byKey));
+        when(modelMapper.map(byKey, PaymentResponseDto.class)).thenReturn(dto);
+
+        PaymentResponseDto response = paymentService.createPayment(request);
+
+        assertEquals(42L, response.getOrderId());
+        assertEquals("FAILED", response.getPaymentStatus());
+        verify(orderStatusEventPublisher).publish(any(OrderStatusUpdateEvent.class));
+    }
+
+    @Test
+    void createPayment_whenOrderResponseIsNull_throwsPaymentException() {
+        PaymentRequestDto request = new PaymentRequestDto();
+        request.setOrderId(17L);
+        request.setIdempotencyKey("k17");
+
+        when(paymentRepository.findAllByOrderIdOrderByCreatedAtDescIdDesc(17L)).thenReturn(List.of());
+        when(paymentRepository.findAllByIdempotencyKeyOrderByCreatedAtDescIdDesc("k17")).thenReturn(List.of());
+        when(orderClient.getOrderById(17L)).thenReturn(null);
+
+        assertThrows(PaymentException.class, () -> paymentService.createPayment(request));
+    }
+
+    @Test
     void verifyPayment_whenAlreadySuccess_returnsWithoutChangingStatus() {
         PaymentVerificationRequestDto request = new PaymentVerificationRequestDto();
         request.setRazorpayOrderId("order_1");
@@ -124,6 +178,18 @@ class PaymentServiceImplTest {
 
         assertEquals("SUCCESS", response.getPaymentStatus());
         verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    void verifyPayment_whenPaymentMissing_throwsPaymentVerificationException() {
+        PaymentVerificationRequestDto request = new PaymentVerificationRequestDto();
+        request.setRazorpayOrderId("missing");
+        request.setRazorpayPaymentId("pay_x");
+        request.setRazorpaySignature("sig_x");
+
+        when(paymentRepository.findByRazorpayOrderId("missing")).thenReturn(Optional.empty());
+
+        assertThrows(PaymentVerificationException.class, () -> paymentService.verifyPayment(request));
     }
 
     @Test
