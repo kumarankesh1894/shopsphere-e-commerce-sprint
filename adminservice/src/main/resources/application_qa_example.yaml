@@ -1,0 +1,27 @@
+spring:
+  datasource:
+    url: ${ADMIN_DB_URL}
+    username: ${ADMIN_DB_USERNAME}
+    password: ${ADMIN_DB_PASSWORD}
+  jpa:
+    show-sql: false
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_DEFAULT_ZONE}
+
+management:
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT}
+
+logging:
+  level:
+    com.shopsphere: INFO
+    org.springframework.cloud.openfeign: INFO
+

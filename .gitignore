@@ -1,4 +1,10 @@
 **/application.yaml
 **/application.yml
+**/application-dev.yaml
+**/application-dev.yml
+**/application-prod.yaml
+**/application-prod.yml
+**/application-qa.yaml
+**/application-qa.yml
 .idea/
 target/

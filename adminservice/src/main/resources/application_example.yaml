@@ -4,33 +4,23 @@ server:
 spring:
   application:
     name: adminservice
-
-  datasource:
-    url: jdbc:mysql://localhost:3306/admindb?createDatabaseIfNotExist=true
-    username: username
-    password: password
+  profiles:
+    default: dev
 
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
     properties:
       hibernate:
         format_sql: true
-
-  data:
-    redis:
-      host: localhost
-      port: 6379
 
   cache:
     type: redis
 
 # Eureka Config
 eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
 
 # Feign Config
 feign:
@@ -40,12 +30,6 @@ feign:
         connectTimeout: 5000
         readTimeout: 5000
         loggerLevel: full
-
-# Logging (for debugging Feign calls)
-logging:
-  level:
-    com.shopsphere: DEBUG
-    org.springframework.cloud.openfeign: DEBUG
 
 # Swagger
 springdoc:
@@ -58,7 +42,4 @@ management:
   tracing:
     sampling:
       probability: 1.0
-  zipkin:
-    tracing:
-      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
 

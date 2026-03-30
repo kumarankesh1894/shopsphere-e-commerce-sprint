@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: api-gateway
+  profiles:
+    default: dev
 
   #Here we will define the routes for our gateway,
   # We are using Eureka for service discovery,
@@ -14,29 +16,40 @@ spring:
     gateway:
       routes:
         - id: auth-service
-          uri:
+          uri: lb://authservice
           predicates:
-            - Path=
+            - Path=/api/auth/**
         #Just for the testing purpose, we are routing user-service to authservice, but in real application it should be routed to user-service
-        - id:
-          uri:
+        - id: user-service
+          uri: lb://authservice
           predicates:
-            - Path=
+            - Path=/api/users/**
+        - id: admin-service
+          uri: lb://adminservice
+          predicates:
+            - Path=/api/admin/**
 
-eureka:            #eureka is at root level, not under spring
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka/
+        - id: catalog-service
+          uri: lb://catalogservice
+          predicates:
+            - Path=/api/catalog/**
+        - id: order-service
+          uri: lb://orderservice
+          predicates:
+            - Path=/api/cart/**, /api/checkout/**, /api/orders/**
+
+        - id: payment-service
+          uri: lb://paymentservice
+          predicates:
+            - Path=/api/payments/internal/**
+
+
+eureka:
   instance:
     prefer-ip-address: true
-
-jwt:
-  secret: secretKey
 
 management:
   tracing:
     sampling:
       probability: 1.0
-  zipkin:
-    tracing:
-      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
+

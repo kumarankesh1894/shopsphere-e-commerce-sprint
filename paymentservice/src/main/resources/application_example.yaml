@@ -4,16 +4,14 @@ server:
 spring:
   application:
     name: paymentservice
+  profiles:
+    default: dev
 
   datasource:
-    url: jdbc:mysql://localhost:3306/paymentdb?createDatabaseIfNotExist=true
-    username: username
-    password: password
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
     database-platform: org.hibernate.dialect.MySQLDialect
     properties:
       hibernate:
@@ -22,22 +20,9 @@ spring:
     user:
       name: ""
       password: ""
-  rabbitmq:
-    host: localhost
-    port: 5672
-    username: guest
-    password: guest
-
-eureka:            #eureka is at root level, not under spring
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka/
+eureka:
   instance:
     prefer-ip-address: true
-
-razorpay:
-  key-id: ${RAZORPAY_KEY_ID:your_razorpay_key_id_here}
-  key-secret: ${RAZORPAY_KEY_SECRET:your_razorpay_key_secret_here}
 
 payment:
   currency: INR
@@ -46,7 +31,4 @@ management:
   tracing:
     sampling:
       probability: 1.0
-  zipkin:
-    tracing:
-      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
 

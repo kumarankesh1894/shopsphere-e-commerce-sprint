@@ -1,32 +1,24 @@
-
 server:
   port: 8081
+
 spring:
   application:
     name: authservice
-  datasource:
-    url: jdbc:mysql://localhost:3306/user_db?createDatabaseIfNotExist=true
-    username: password
-    password: password
-  jpa:     #it is under spring, not under datasource
+  profiles:
+    default: dev
+  jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
 
-eureka:            #eureka is at root level, not under spring
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka/
+eureka:
   instance:
     prefer-ip-address: true
+
 jwt:
-  secret: secretKey
-  expiration: expirationtime # in milliseconds
+  expiration: 86400000
 
 management:
   tracing:
     sampling:
       probability: 1.0
-  zipkin:
-    tracing:
-      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
+

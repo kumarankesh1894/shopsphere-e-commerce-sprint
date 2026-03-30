@@ -1,0 +1,14 @@
+eureka:
+  instance:
+    hostname: ${EUREKA_HOSTNAME}
+  client:
+    service-url:
+      defaultZone: ${EUREKA_DEFAULT_ZONE}
+  server:
+    enable-self-preservation: true
+    eviction-interval-timer-in-ms: 30000
+
+logging:
+  level:
+    root: WARN
+

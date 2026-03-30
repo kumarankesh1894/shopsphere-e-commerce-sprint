@@ -1,8 +1,8 @@
 spring:
   datasource:
     url: jdbc:mysql://localhost:3306/catalogdb?createDatabaseIfNotExist=true
-    username: root
-    password: root
+    username: username
+    password: password
   jpa:
     show-sql: true
   data:
