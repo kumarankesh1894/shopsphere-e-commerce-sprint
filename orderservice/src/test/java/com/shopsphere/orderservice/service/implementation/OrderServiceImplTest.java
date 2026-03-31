@@ -10,7 +10,13 @@ import com.shopsphere.orderservice.entity.Order;
 import com.shopsphere.orderservice.entity.OrderItem;
 import com.shopsphere.orderservice.enums.OrderStatus;
 import com.shopsphere.orderservice.exception.InvalidOrderStateException;
+import com.shopsphere.orderservice.exception.OrderAlreadyCancelledException;
+import com.shopsphere.orderservice.exception.OrderAlreadyDeliveredException;
+import com.shopsphere.orderservice.exception.OrderAlreadyPackedException;
+import com.shopsphere.orderservice.exception.OrderAlreadyShippedException;
+import com.shopsphere.orderservice.exception.OrderCancellationNotAllowedException;
 import com.shopsphere.orderservice.exception.OrderNotFoundException;
+import com.shopsphere.orderservice.exception.OrderTransitionNotAllowedException;
 import com.shopsphere.orderservice.exception.UnauthorizedException;
 import com.shopsphere.orderservice.repository.OrderRepository;
 import org.junit.jupiter.api.Test;
@@ -36,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -93,6 +100,21 @@ class OrderServiceImplTest {
         assertEquals(11L, response.getOrderId());
         assertEquals("PROCESSING", response.getPaymentStatus());
         verify(paymentClient).createPayment(any());
+    }
+
+    @Test
+    void startPayment_whenRequestedByDifferentUser_throwsUnauthorizedException() {
+        Order order = Order.builder()
+                .id(12L)
+                .userId(99L)
+                .status(OrderStatus.CHECKOUT)
+                .totalAmount(new BigDecimal("1499.00"))
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(orderRepository.findById(12L)).thenReturn(Optional.of(order));
+
+        assertThrows(UnauthorizedException.class, () -> orderService.startPayment(12L, 2L));
     }
 
     @Test
@@ -202,6 +224,20 @@ class OrderServiceImplTest {
     }
 
     @Test
+    void getMyOrders_whenPageAndSizeOutOfRange_appliesSafeBounds() {
+        Page<Order> page = new PageImpl<>(List.of(), PageRequest.of(0, 50), 0);
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        when(orderRepository.findByUserId(org.mockito.ArgumentMatchers.eq(2L), any(Pageable.class)))
+                .thenReturn(page);
+
+        orderService.getMyOrders(2L, -3, 500, null);
+
+        verify(orderRepository).findByUserId(org.mockito.ArgumentMatchers.eq(2L), pageableCaptor.capture());
+        assertEquals(0, pageableCaptor.getValue().getPageNumber());
+        assertEquals(50, pageableCaptor.getValue().getPageSize());
+    }
+
+    @Test
     void placeOrder_whenPaid_setsPacked() {
         Order order = Order.builder()
                 .id(200L)
@@ -218,6 +254,34 @@ class OrderServiceImplTest {
         assertEquals(OrderStatus.PACKED, order.getStatus());
         assertNotNull(order.getPackedAt());
         verify(orderRepository).save(order);
+    }
+
+    @Test
+    void placeOrder_whenAlreadyPacked_throwsOrderAlreadyPackedException() {
+        Order order = Order.builder()
+                .id(205L)
+                .userId(2L)
+                .status(OrderStatus.PACKED)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(orderRepository.findById(205L)).thenReturn(Optional.of(order));
+
+        assertThrows(OrderAlreadyPackedException.class, () -> orderService.placeOrder(205L));
+    }
+
+    @Test
+    void placeOrder_whenNotPaid_throwsOrderTransitionNotAllowedException() {
+        Order order = Order.builder()
+                .id(208L)
+                .userId(2L)
+                .status(OrderStatus.CHECKOUT)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(orderRepository.findById(208L)).thenReturn(Optional.of(order));
+
+        assertThrows(OrderTransitionNotAllowedException.class, () -> orderService.placeOrder(208L));
     }
 
     @Test
@@ -240,6 +304,34 @@ class OrderServiceImplTest {
     }
 
     @Test
+    void shipOrder_whenAlreadyShipped_throwsOrderAlreadyShippedException() {
+        Order order = Order.builder()
+                .id(209L)
+                .userId(2L)
+                .status(OrderStatus.SHIPPED)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(orderRepository.findById(209L)).thenReturn(Optional.of(order));
+
+        assertThrows(OrderAlreadyShippedException.class, () -> orderService.shipOrder(209L));
+    }
+
+    @Test
+    void shipOrder_whenDelivered_throwsOrderAlreadyDeliveredException() {
+        Order order = Order.builder()
+                .id(210L)
+                .userId(2L)
+                .status(OrderStatus.DELIVERED)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(orderRepository.findById(210L)).thenReturn(Optional.of(order));
+
+        assertThrows(OrderAlreadyDeliveredException.class, () -> orderService.shipOrder(210L));
+    }
+
+    @Test
     void deliverOrder_whenShipped_setsDelivered() {
         Order order = Order.builder()
                 .id(202L)
@@ -259,6 +351,20 @@ class OrderServiceImplTest {
     }
 
     @Test
+    void deliverOrder_whenNotShipped_throwsOrderTransitionNotAllowedException() {
+        Order order = Order.builder()
+                .id(211L)
+                .userId(2L)
+                .status(OrderStatus.PACKED)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(orderRepository.findById(211L)).thenReturn(Optional.of(order));
+
+        assertThrows(OrderTransitionNotAllowedException.class, () -> orderService.deliverOrder(211L));
+    }
+
+    @Test
     void cancelOrderAsAdmin_whenAllowed_setsCancelled() {
         Order order = Order.builder()
                 .id(203L)
@@ -274,6 +380,73 @@ class OrderServiceImplTest {
 
         assertEquals(OrderStatus.CANCELLED, order.getStatus());
         assertNotNull(order.getCancelledAt());
+        verify(orderRepository).save(order);
+    }
+
+    @Test
+    void cancelOrder_whenDelivered_throwsOrderCancellationNotAllowedException() {
+        Order order = Order.builder()
+                .id(206L)
+                .userId(2L)
+                .status(OrderStatus.DELIVERED)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(orderRepository.findById(206L)).thenReturn(Optional.of(order));
+
+        assertThrows(OrderCancellationNotAllowedException.class, () -> orderService.cancelOrder(206L, 2L));
+    }
+
+    @Test
+    void cancelOrder_whenAlreadyCancelled_throwsOrderAlreadyCancelledException() {
+        Order order = Order.builder()
+                .id(212L)
+                .userId(2L)
+                .status(OrderStatus.CANCELLED)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(orderRepository.findById(212L)).thenReturn(Optional.of(order));
+
+        assertThrows(OrderAlreadyCancelledException.class, () -> orderService.cancelOrder(212L, 2L));
+    }
+
+    @Test
+    void cancelOrderAsAdmin_whenDelivered_throwsOrderCancellationNotAllowedException() {
+        Order order = Order.builder()
+                .id(213L)
+                .userId(2L)
+                .status(OrderStatus.DELIVERED)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(orderRepository.findById(213L)).thenReturn(Optional.of(order));
+
+        assertThrows(OrderCancellationNotAllowedException.class, () -> orderService.cancelOrderAsAdmin(213L));
+    }
+
+    @Test
+    void updateOrderStatus_whenAlreadyPaid_doesNotReduceStockAgain() {
+        OrderItem item = OrderItem.builder()
+                .productId(7L)
+                .quantity(1)
+                .price(new BigDecimal("100.00"))
+                .productName("Cable")
+                .build();
+
+        Order order = Order.builder()
+                .id(207L)
+                .userId(2L)
+                .status(OrderStatus.PAID)
+                .items(List.of(item))
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(orderRepository.findById(207L)).thenReturn(Optional.of(order));
+
+        orderService.updateOrderStatus(207L, OrderStatus.PAID);
+
+        verify(catalogClient, never()).reduceStock(any(), any());
         verify(orderRepository).save(order);
     }
 

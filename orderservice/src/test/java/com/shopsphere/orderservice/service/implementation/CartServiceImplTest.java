@@ -25,6 +25,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -104,6 +105,56 @@ class CartServiceImplTest {
     }
 
     @Test
+    void addToCart_whenProductAlreadyInCart_incrementsQuantity() {
+        CartItemRequestDto request = CartItemRequestDto.builder()
+                .productId(15L)
+                .quantity(2)
+                .build();
+
+        ProductResponseDto product = ProductResponseDto.builder()
+                .productId(15L)
+                .productName("Keyboard")
+                .price(new BigDecimal("1200.00"))
+                .stock(10)
+                .build();
+
+        Cart cart = Cart.builder().id(9L).userId(2L).build();
+        CartItem existing = CartItem.builder()
+                .productId(15L)
+                .productName("Keyboard")
+                .price(new BigDecimal("1200.00"))
+                .quantity(1)
+                .cart(cart)
+                .build();
+
+        Cart reloaded = Cart.builder().id(9L).userId(2L).items(List.of(existing)).build();
+
+        when(catalogClient.getProductById(15L)).thenReturn(ApiResponse.success(product, "ok"));
+        when(cartRepository.findByUserId(2L)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findByCartIdAndProductId(9L, 15L)).thenReturn(Optional.of(existing));
+        when(cartRepository.findById(9L)).thenReturn(Optional.of(reloaded));
+
+        CartResponseDto response = cartService.addToCart(2L, request);
+
+        assertEquals(3, existing.getQuantity());
+        assertEquals(1, response.getItems().size());
+        verify(cartItemRepository).save(existing);
+    }
+
+    @Test
+    void addToCart_whenCatalogResponseMissing_throwsRuntimeException() {
+        CartItemRequestDto request = CartItemRequestDto.builder()
+                .productId(99L)
+                .quantity(1)
+                .build();
+
+        when(catalogClient.getProductById(99L)).thenReturn(null);
+
+        assertThrows(RuntimeException.class, () -> cartService.addToCart(2L, request));
+        verify(cartRepository, never()).save(any(Cart.class));
+    }
+
+    @Test
     void getCart_whenMissing_returnsEmptyCartResponse() {
         when(cartRepository.findByUserId(3L)).thenReturn(Optional.empty());
 
@@ -116,6 +167,74 @@ class CartServiceImplTest {
     @Test
     void updateItem_whenQuantityInvalid_throwsRuntimeException() {
         assertThrows(RuntimeException.class, () -> cartService.updateItem(2L, 11L, 0));
+    }
+
+    @Test
+    void updateItem_whenCartMissing_throwsCartNotFoundException() {
+        when(cartRepository.findByUserId(2L)).thenReturn(Optional.empty());
+
+        assertThrows(CartNotFoundException.class, () -> cartService.updateItem(2L, 11L, 2));
+    }
+
+    @Test
+    void updateItem_whenItemMissing_throwsRuntimeException() {
+        Cart cart = Cart.builder().id(7L).userId(2L).build();
+        when(cartRepository.findByUserId(2L)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findByCartIdAndProductId(7L, 11L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> cartService.updateItem(2L, 11L, 2));
+    }
+
+    @Test
+    void updateItem_whenCatalogProductMissing_throwsRuntimeException() {
+        Cart cart = Cart.builder().id(7L).userId(2L).build();
+        CartItem existing = CartItem.builder().productId(11L).quantity(1).cart(cart).build();
+
+        when(cartRepository.findByUserId(2L)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findByCartIdAndProductId(7L, 11L)).thenReturn(Optional.of(existing));
+        when(catalogClient.getProductById(11L)).thenReturn(null);
+
+        assertThrows(RuntimeException.class, () -> cartService.updateItem(2L, 11L, 3));
+    }
+
+    @Test
+    void updateItem_whenRequestedQuantityExceedsStock_throwsRuntimeException() {
+        Cart cart = Cart.builder().id(7L).userId(2L).build();
+        CartItem existing = CartItem.builder().productId(11L).quantity(1).cart(cart).build();
+        ProductResponseDto product = ProductResponseDto.builder().productId(11L).stock(2).build();
+
+        when(cartRepository.findByUserId(2L)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findByCartIdAndProductId(7L, 11L)).thenReturn(Optional.of(existing));
+        when(catalogClient.getProductById(11L)).thenReturn(ApiResponse.success(product, "ok"));
+
+        assertThrows(RuntimeException.class, () -> cartService.updateItem(2L, 11L, 5));
+    }
+
+    @Test
+    void updateItem_whenValid_updatesQuantityAndReturnsCart() {
+        Cart cart = Cart.builder().id(8L).userId(2L).build();
+        CartItem existing = CartItem.builder()
+                .productId(11L)
+                .productName("Headphone")
+                .price(new BigDecimal("999.00"))
+                .quantity(1)
+                .cart(cart)
+                .build();
+        ProductResponseDto product = ProductResponseDto.builder().productId(11L).stock(10).build();
+
+        Cart reloaded = Cart.builder().id(8L).userId(2L).items(List.of(existing)).build();
+
+        when(cartRepository.findByUserId(2L)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findByCartIdAndProductId(8L, 11L)).thenReturn(Optional.of(existing));
+        when(catalogClient.getProductById(11L)).thenReturn(ApiResponse.success(product, "ok"));
+        when(cartRepository.findById(8L)).thenReturn(Optional.of(reloaded));
+
+        CartResponseDto response = cartService.updateItem(2L, 11L, 4);
+
+        assertEquals(4, existing.getQuantity());
+        assertEquals(1, response.getItems().size());
+        assertEquals(new BigDecimal("3996.00"), response.getTotalAmount());
+        verify(cartItemRepository).save(existing);
     }
 
     @Test
@@ -146,6 +265,63 @@ class CartServiceImplTest {
         when(cartRepository.findByUserId(55L)).thenReturn(Optional.empty());
 
         assertThrows(CartNotFoundException.class, () -> cartService.clearCart(55L));
+    }
+
+    @Test
+    void removeItem_whenCartMissing_throwsCartNotFoundException() {
+        when(cartRepository.findByUserId(66L)).thenReturn(Optional.empty());
+
+        assertThrows(CartNotFoundException.class, () -> cartService.removeItem(66L, 10L));
+    }
+
+    @Test
+    void removeItem_whenItemMissing_throwsRuntimeException() {
+        Cart cart = Cart.builder().id(71L).userId(2L).build();
+        when(cartRepository.findByUserId(2L)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findByCartIdAndProductId(71L, 10L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> cartService.removeItem(2L, 10L));
+    }
+
+    @Test
+    void getCart_whenExistingCartWithItems_returnsComputedTotal() {
+        CartItem i1 = CartItem.builder()
+                .productId(1L)
+                .productName("A")
+                .price(new BigDecimal("10.00"))
+                .quantity(2)
+                .build();
+        CartItem i2 = CartItem.builder()
+                .productId(2L)
+                .productName("B")
+                .price(new BigDecimal("5.50"))
+                .quantity(3)
+                .build();
+        Cart cart = Cart.builder().id(90L).userId(2L).items(List.of(i1, i2)).build();
+
+        when(cartRepository.findByUserId(2L)).thenReturn(Optional.of(cart));
+
+        CartResponseDto response = cartService.getCart(2L);
+
+        assertEquals(2, response.getItems().size());
+        assertEquals(new BigDecimal("36.50"), response.getTotalAmount());
+    }
+
+    @Test
+    void clearCart_whenCartExists_clearsItemsAndSaves() {
+        CartItem item = CartItem.builder()
+                .productId(3L)
+                .quantity(1)
+                .price(new BigDecimal("10.00"))
+                .build();
+        Cart cart = Cart.builder().id(70L).userId(2L).items(new ArrayList<>(List.of(item))).build();
+
+        when(cartRepository.findByUserId(2L)).thenReturn(Optional.of(cart));
+
+        cartService.clearCart(2L);
+
+        assertEquals(0, cart.getItems().size());
+        verify(cartRepository).save(cart);
     }
 }
 

@@ -18,6 +18,16 @@
 
         <!-- Java analysis level -->
         <sonar.java.source>17</sonar.java.source>
+        <sonar.coverage.jacoco.xmlReportPaths>
+            authservice/target/site/jacoco/jacoco.xml,
+            catalogservice/target/site/jacoco/jacoco.xml,
+            apigateway/target/site/jacoco/jacoco.xml,
+            eurekaserver/target/site/jacoco/jacoco.xml,
+            orderservice/target/site/jacoco/jacoco.xml,
+            paymentservice/target/site/jacoco/jacoco.xml,
+            adminservice/target/site/jacoco/jacoco.xml,
+            configserver/target/site/jacoco/jacoco.xml
+        </sonar.coverage.jacoco.xmlReportPaths>
     </properties>
 
     <modules>
@@ -28,6 +38,7 @@
         <module>orderservice</module>
         <module>paymentservice</module>
         <module>adminservice</module>
+        <module>configserver</module>
 
     </modules>
 

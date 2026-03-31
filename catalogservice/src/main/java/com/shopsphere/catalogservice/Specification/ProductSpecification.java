@@ -76,7 +76,7 @@ public class ProductSpecification {
 
             if (filter.getMaxPrice() != null) {
                 predicate = cb.and(predicate,
-                        cb.greaterThanOrEqualTo(
+                        cb.lessThanOrEqualTo(
                                 root.get("price"),
                                 BigDecimal.valueOf(filter.getMaxPrice())
                         ));
