@@ -2,6 +2,7 @@ package com.shopsphere.paymentservice.entity;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.shopsphere.paymentservice.enums.Gateway;
+import com.shopsphere.paymentservice.enums.PaymentMethod;
 import com.shopsphere.paymentservice.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -35,6 +36,10 @@ public class Payment {
 
     @Enumerated(EnumType.STRING)
     private Gateway gateway;
+
+    // Captures the user-selected payment method (COD/UPI/CARD).
+    @Enumerated(EnumType.STRING)
+    private PaymentMethod paymentMethod;
 
     private String currency;
 

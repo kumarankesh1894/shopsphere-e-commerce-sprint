@@ -506,6 +506,11 @@ public class OrderServiceImpl implements OrderService {
         // A fresh key per initiation attempt; paymentservice also guards by orderId.
         dto.setIdempotencyKey(order.getId() + "_" + System.currentTimeMillis());
 
+        // Ensure paymentservice receives a method even if legacy orders missed it.
+        dto.setPaymentMethod(order.getPaymentMethod() != null
+                ? order.getPaymentMethod()
+                : com.shopsphere.orderservice.enums.PaymentMethod.COD);
+
         return dto;
     }
 

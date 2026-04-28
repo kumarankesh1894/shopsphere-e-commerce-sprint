@@ -3,6 +3,7 @@ package com.shopsphere.orderservice.service.implementation;
 import com.shopsphere.orderservice.dto.*;
 import com.shopsphere.orderservice.entity.*;
 import com.shopsphere.orderservice.enums.OrderStatus;
+import com.shopsphere.orderservice.enums.PaymentMethod;
 import com.shopsphere.orderservice.repository.*;
 import com.shopsphere.orderservice.service.CartService;
 import com.shopsphere.orderservice.service.CheckoutService;
@@ -51,12 +52,18 @@ public class CheckoutServiceImpl implements CheckoutService {
         Address address = modelMapper.map(request.getAddress(), Address.class);
 
         // 4. Create Order
+        // Default to COD when client does not choose a payment method.
+        PaymentMethod selectedMethod = request.getPaymentMethod() != null
+                ? request.getPaymentMethod()
+                : PaymentMethod.COD;
+
         Order order = Order.builder()
                 .userId(userId)
                 .status(OrderStatus.CHECKOUT)
                 .idempotencyKey(request.getIdempotencyKey())
                 .createdAt(LocalDateTime.now())
                 .deliveryAddress(address)
+                .paymentMethod(selectedMethod)
                 .build();
 
         // 5. Convert CartItems → OrderItems

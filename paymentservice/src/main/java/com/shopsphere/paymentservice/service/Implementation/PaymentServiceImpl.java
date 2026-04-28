@@ -5,6 +5,7 @@ import com.shopsphere.paymentservice.dto.*;
 import com.shopsphere.paymentservice.entity.Payment;
 import com.shopsphere.paymentservice.enums.Gateway;
 import com.shopsphere.paymentservice.enums.OrderStatus;
+import com.shopsphere.paymentservice.enums.PaymentMethod;
 import com.shopsphere.paymentservice.enums.PaymentStatus;
 import com.shopsphere.paymentservice.exception.PaymentException;
 import com.shopsphere.paymentservice.exception.PaymentVerificationException;
@@ -101,6 +102,11 @@ public class PaymentServiceImpl implements PaymentService {
             throw new PaymentException("idempotencyKey is required");
         }
 
+        // Default to COD so payment method is optional for clients.
+        PaymentMethod paymentMethod = request.getPaymentMethod() != null
+                ? request.getPaymentMethod()
+                : PaymentMethod.COD;
+
         log.info("payment.create.start orderId={} idemKey={}", request.getOrderId(), request.getIdempotencyKey());
 
         List<Payment> existingByOrder =
@@ -162,11 +168,21 @@ public class PaymentServiceImpl implements PaymentService {
         payment.setStatus(PaymentStatus.INITIATED);
         payment.setIdempotencyKey(request.getIdempotencyKey());
         payment.setCreatedAt(LocalDateTime.now());
-        payment.setGateway(Gateway.RAZORPAY);
+        payment.setPaymentMethod(paymentMethod);
+        payment.setGateway(paymentMethod == PaymentMethod.COD ? null : Gateway.RAZORPAY);
         payment.setCurrency(paymentCurrency);
         payment.setAmountInPaise(toPaise(order.getTotalAmount()));
 
         payment = paymentRepository.save(payment);
+
+        if (paymentMethod == PaymentMethod.COD) {
+            // COD completes immediately without gateway order creation.
+            payment.setStatus(PaymentStatus.SUCCESS);
+            paymentRepository.save(payment);
+            safeUpdateOrderStatus(order.getId(), OrderStatus.PAID);
+            log.info("payment.create.cod_success orderId={} paymentId={}", order.getId(), payment.getId());
+            return convertToDto(payment);
+        }
 
         try {
             // 4. Create Razorpay order for client-side checkout.
@@ -303,9 +319,12 @@ public class PaymentServiceImpl implements PaymentService {
                 modelMapper.map(payment, PaymentResponseDto.class);
         dto.setPaymentStatus(payment.getStatus().name());
         dto.setGateway(payment.getGateway() != null ? payment.getGateway().name() : null);
-        dto.setRazorpayKeyId(razorpayKeyId);
+        dto.setPaymentMethod(payment.getPaymentMethod() != null ? payment.getPaymentMethod().name() : null);
+        dto.setRazorpayKeyId(payment.getGateway() == Gateway.RAZORPAY ? razorpayKeyId : null);
         dto.setFailureReason(payment.getFailureReason());
-        dto.setMessage("Use razorpayOrderId and razorpayKeyId on frontend checkout.");
+        dto.setMessage(payment.getPaymentMethod() != PaymentMethod.COD
+                ? "Use razorpayOrderId and razorpayKeyId on frontend checkout."
+                : "COD selected; no gateway order created.");
         return dto;
     }
 

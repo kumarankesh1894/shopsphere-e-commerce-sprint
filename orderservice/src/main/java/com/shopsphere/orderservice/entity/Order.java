@@ -1,6 +1,7 @@
 package com.shopsphere.orderservice.entity;
 
 import com.shopsphere.orderservice.enums.OrderStatus;
+import com.shopsphere.orderservice.enums.PaymentMethod;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -52,4 +53,8 @@ public class Order {
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items;
+
+    @Enumerated(EnumType.STRING)
+    // User-selected payment method captured at checkout.
+    private PaymentMethod paymentMethod;
 }

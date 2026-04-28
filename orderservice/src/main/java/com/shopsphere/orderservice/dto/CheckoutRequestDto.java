@@ -1,6 +1,7 @@
 package com.shopsphere.orderservice.dto;
 
 import com.shopsphere.orderservice.entity.Address;
+import com.shopsphere.orderservice.enums.PaymentMethod;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -19,4 +20,7 @@ public class CheckoutRequestDto {
     @Valid
     @NotNull(message = "Address is required")
     private AddressDto address;
+
+    // Optional; defaults to COD when omitted.
+    private PaymentMethod paymentMethod;
 }

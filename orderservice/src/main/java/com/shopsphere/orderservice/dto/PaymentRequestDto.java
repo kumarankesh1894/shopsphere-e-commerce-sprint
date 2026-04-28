@@ -1,5 +1,6 @@
 package com.shopsphere.orderservice.dto;
 
+import com.shopsphere.orderservice.enums.PaymentMethod;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -16,4 +17,7 @@ public class PaymentRequestDto {
 
     private Long orderId;
     private String idempotencyKey;
+
+    // Optional; defaults to COD if not provided by the order.
+    private PaymentMethod paymentMethod;
 }
