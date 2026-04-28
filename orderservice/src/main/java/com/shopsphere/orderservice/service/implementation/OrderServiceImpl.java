@@ -180,8 +180,9 @@ public class OrderServiceImpl implements OrderService {
             throw new OrderAlreadyPackedException("Order is already packed and ready to ship.");
         }
 
-        if (order.getStatus() != OrderStatus.PAID) {
-            throw new OrderTransitionNotAllowedException("Cannot pack order. Order must be in PAID state.");
+        // COD orders stay PAYMENT_DUE until delivery, so packing must allow PAYMENT_DUE too.
+        if (order.getStatus() != OrderStatus.PAID && order.getStatus() != OrderStatus.PAYMENT_DUE) {
+            throw new OrderTransitionNotAllowedException("Cannot pack order. Order must be in PAID or PAYMENT_DUE state.");
         }
 
         order.setStatus(OrderStatus.PACKED); // or PLACED if you add it
@@ -251,7 +252,12 @@ public class OrderServiceImpl implements OrderService {
             throw new OrderTransitionNotAllowedException("Cannot deliver order. Order must be in SHIPPED state.");
         }
 
-        order.setStatus(OrderStatus.DELIVERED);
+        // For COD, we mark payment as completed at delivery and store deliveredAt.
+        if (order.getPaymentMethod() == com.shopsphere.orderservice.enums.PaymentMethod.COD) {
+            order.setStatus(OrderStatus.PAID);
+        } else {
+            order.setStatus(OrderStatus.DELIVERED);
+        }
         order.setDeliveredAt(LocalDateTime.now());
         orderRepository.save(order);
         log.info("order.lifecycle.deliver.success orderId={} newStatus=DELIVERED", orderId);
@@ -355,8 +361,10 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new OrderNotFoundException("Order not found"));
         OrderStatus previousStatus = order.getStatus();
 
-        // Reduce inventory only once when payment is confirmed.
-        if (status == OrderStatus.PAID && order.getStatus() != OrderStatus.PAID) {
+        // Reduce inventory once payment is confirmed, including COD which becomes PAYMENT_DUE.
+        if ((status == OrderStatus.PAID || status == OrderStatus.PAYMENT_DUE)
+                && order.getStatus() != OrderStatus.PAID
+                && order.getStatus() != OrderStatus.PAYMENT_DUE) {
             reduceStockForOrder(order);
         }
 
@@ -485,6 +493,18 @@ public class OrderServiceImpl implements OrderService {
         // Step 4: Call Payment Service
         PaymentResponseDto response = paymentClient.createPayment(buildPaymentRequest(order));
         log.info("order.payment.request_sent orderId={}", orderId);
+
+        // COD (or other instant success) can be finalized immediately without waiting for async events.
+        boolean isCod = response != null && "COD".equalsIgnoreCase(response.getPaymentMethod());
+        boolean isPaidInstantly = response != null && "SUCCESS".equalsIgnoreCase(response.getPaymentStatus());
+
+        // COD is considered payment-due, not paid, until delivery.
+        if (isCod) {
+            updateOrderStatus(orderId, OrderStatus.PAYMENT_DUE);
+        } else if (isPaidInstantly) {
+            updateOrderStatus(orderId, OrderStatus.PAID);
+        }
+
         return response;
     }
 

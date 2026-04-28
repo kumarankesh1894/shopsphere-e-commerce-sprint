@@ -26,7 +26,7 @@ public class Order {
     private Long userId;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     private OrderStatus status;
 
     @Column(nullable = false)

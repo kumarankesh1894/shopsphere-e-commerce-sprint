@@ -9,6 +9,7 @@ import com.shopsphere.orderservice.dto.PaymentResponseDto;
 import com.shopsphere.orderservice.entity.Order;
 import com.shopsphere.orderservice.entity.OrderItem;
 import com.shopsphere.orderservice.enums.OrderStatus;
+import com.shopsphere.orderservice.enums.PaymentMethod;
 import com.shopsphere.orderservice.exception.InvalidOrderStateException;
 import com.shopsphere.orderservice.exception.OrderAlreadyCancelledException;
 import com.shopsphere.orderservice.exception.OrderAlreadyDeliveredException;
@@ -513,5 +514,162 @@ class OrderServiceImplTest {
 
         assertEquals(1, result.size());
         assertEquals(301L, result.get(0).getOrderId());
+    }
+
+    @Test
+    void startPayment_whenCheckoutAndCod_updatesPaymentDueAndReducesStock() {
+        OrderItem item = OrderItem.builder()
+                .productId(77L)
+                .quantity(2)
+                .price(new BigDecimal("100.00"))
+                .productName("Mouse")
+                .build();
+
+        Order order = Order.builder()
+                .id(15L)
+                .userId(2L)
+                .status(OrderStatus.CHECKOUT)
+                .paymentMethod(PaymentMethod.COD)
+                .items(List.of(item))
+                .totalAmount(new BigDecimal("200.00"))
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        PaymentResponseDto paymentResponseDto = new PaymentResponseDto();
+        paymentResponseDto.setOrderId(15L);
+        paymentResponseDto.setPaymentMethod("COD");
+        paymentResponseDto.setPaymentStatus("SUCCESS");
+
+        when(orderRepository.findById(15L)).thenReturn(Optional.of(order));
+        when(paymentClient.createPayment(any())).thenReturn(paymentResponseDto);
+
+        PaymentResponseDto response = orderService.startPayment(15L, 2L);
+
+        assertEquals("COD", response.getPaymentMethod());
+        assertEquals(OrderStatus.PAYMENT_DUE, order.getStatus());
+        verify(catalogClient).reduceStock(77L, 2);
+        verify(orderRepository).save(order);
+    }
+
+    @Test
+    void startPayment_whenCheckoutAndInstantPaidNonCod_setsPaid() {
+        OrderItem item = OrderItem.builder()
+                .productId(78L)
+                .quantity(1)
+                .price(new BigDecimal("500.00"))
+                .productName("Headset")
+                .build();
+
+        Order order = Order.builder()
+                .id(16L)
+                .userId(2L)
+                .status(OrderStatus.CHECKOUT)
+                .paymentMethod(PaymentMethod.UPI)
+                .items(List.of(item))
+                .totalAmount(new BigDecimal("500.00"))
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        PaymentResponseDto paymentResponseDto = new PaymentResponseDto();
+        paymentResponseDto.setOrderId(16L);
+        paymentResponseDto.setPaymentMethod("UPI");
+        paymentResponseDto.setPaymentStatus("SUCCESS");
+
+        when(orderRepository.findById(16L)).thenReturn(Optional.of(order));
+        when(paymentClient.createPayment(any())).thenReturn(paymentResponseDto);
+
+        orderService.startPayment(16L, 2L);
+
+        assertEquals(OrderStatus.PAID, order.getStatus());
+        verify(catalogClient).reduceStock(78L, 1);
+        verify(orderRepository).save(order);
+    }
+
+    @Test
+    void placeOrder_whenPaymentDue_setsPacked() {
+        Order order = Order.builder()
+                .id(206L)
+                .userId(2L)
+                .status(OrderStatus.PAYMENT_DUE)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(orderRepository.findById(206L)).thenReturn(Optional.of(order));
+
+        orderService.placeOrder(206L);
+
+        assertEquals(OrderStatus.PACKED, order.getStatus());
+        assertNotNull(order.getPackedAt());
+        verify(orderRepository).save(order);
+    }
+
+    @Test
+    void deliverOrder_whenCod_marksPaid() {
+        Order order = Order.builder()
+                .id(212L)
+                .userId(2L)
+                .status(OrderStatus.SHIPPED)
+                .paymentMethod(PaymentMethod.COD)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(orderRepository.findById(212L)).thenReturn(Optional.of(order));
+
+        orderService.deliverOrder(212L);
+
+        assertEquals(OrderStatus.PAID, order.getStatus());
+        assertNotNull(order.getDeliveredAt());
+        verify(orderRepository).save(order);
+    }
+
+    @Test
+    void updateOrderStatus_whenPaymentDue_reducesStockAndSavesOrder() {
+        OrderItem item = OrderItem.builder()
+                .productId(9L)
+                .quantity(4)
+                .price(new BigDecimal("50.00"))
+                .productName("Cable")
+                .build();
+
+        Order order = Order.builder()
+                .id(220L)
+                .userId(2L)
+                .status(OrderStatus.CHECKOUT)
+                .items(List.of(item))
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(orderRepository.findById(220L)).thenReturn(Optional.of(order));
+
+        orderService.updateOrderStatus(220L, OrderStatus.PAYMENT_DUE);
+
+        verify(catalogClient).reduceStock(9L, 4);
+        assertEquals(OrderStatus.PAYMENT_DUE, order.getStatus());
+        verify(orderRepository).save(order);
+    }
+
+    @Test
+    void updateOrderStatus_whenAlreadyPaymentDue_doesNotReduceStockAgain() {
+        OrderItem item = OrderItem.builder()
+                .productId(10L)
+                .quantity(1)
+                .price(new BigDecimal("25.00"))
+                .productName("Adapter")
+                .build();
+
+        Order order = Order.builder()
+                .id(221L)
+                .userId(2L)
+                .status(OrderStatus.PAYMENT_DUE)
+                .items(List.of(item))
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(orderRepository.findById(221L)).thenReturn(Optional.of(order));
+
+        orderService.updateOrderStatus(221L, OrderStatus.PAYMENT_DUE);
+
+        verify(catalogClient, never()).reduceStock(any(), any());
+        verify(orderRepository).save(order);
     }
 }

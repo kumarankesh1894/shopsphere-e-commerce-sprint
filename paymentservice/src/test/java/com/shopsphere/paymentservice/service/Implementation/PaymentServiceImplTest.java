@@ -1,6 +1,7 @@
 package com.shopsphere.paymentservice.service.Implementation;
 
 import com.shopsphere.paymentservice.client.OrderClient;
+import com.shopsphere.paymentservice.dto.OrderResponseDto;
 import com.shopsphere.paymentservice.dto.OrderStatusUpdateEvent;
 import com.shopsphere.paymentservice.dto.PaymentRequestDto;
 import com.shopsphere.paymentservice.dto.PaymentResponseDto;
@@ -8,6 +9,7 @@ import com.shopsphere.paymentservice.dto.PaymentVerificationRequestDto;
 import com.shopsphere.paymentservice.entity.Payment;
 import com.shopsphere.paymentservice.enums.Gateway;
 import com.shopsphere.paymentservice.enums.OrderStatus;
+import com.shopsphere.paymentservice.enums.PaymentMethod;
 import com.shopsphere.paymentservice.enums.PaymentStatus;
 import com.shopsphere.paymentservice.exception.PaymentException;
 import com.shopsphere.paymentservice.exception.PaymentVerificationException;
@@ -500,31 +502,61 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    void createPayment_whenExistingSuccess_publishesPaidStatusEvent() {
+    void createPayment_whenCod_createsSuccessAndPublishesPaymentDue() {
         PaymentRequestDto request = new PaymentRequestDto();
-        request.setOrderId(77L);
-        request.setIdempotencyKey("retry-key");
+        request.setOrderId(88L);
+        request.setIdempotencyKey("cod-key");
+        request.setPaymentMethod(PaymentMethod.COD);
+
+        OrderResponseDto order = new OrderResponseDto();
+        order.setId(88L);
+        order.setUserId(7L);
+        order.setTotalAmount(new java.math.BigDecimal("250.00"));
+
+        when(paymentRepository.findAllByOrderIdOrderByCreatedAtDescIdDesc(88L)).thenReturn(List.of());
+        when(paymentRepository.findAllByIdempotencyKeyOrderByCreatedAtDescIdDesc("cod-key")).thenReturn(List.of());
+        when(orderClient.getOrderById(88L)).thenReturn(order);
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(modelMapper.map(any(Payment.class), org.mockito.ArgumentMatchers.eq(PaymentResponseDto.class)))
+                .thenReturn(new PaymentResponseDto());
+
+        PaymentResponseDto response = paymentService.createPayment(request);
+
+        assertEquals("SUCCESS", response.getPaymentStatus());
+        assertEquals("COD", response.getPaymentMethod());
+
+        ArgumentCaptor<OrderStatusUpdateEvent> eventCaptor = ArgumentCaptor.forClass(OrderStatusUpdateEvent.class);
+        verify(orderStatusEventPublisher).publish(eventCaptor.capture());
+        assertEquals(String.valueOf(OrderStatus.PAYMENT_DUE), eventCaptor.getValue().getStatus());
+    }
+
+    @Test
+    void createPayment_whenExistingSuccessCod_publishesPaymentDueStatusEvent() {
+        PaymentRequestDto request = new PaymentRequestDto();
+        request.setOrderId(89L);
+        request.setIdempotencyKey("reuse-cod");
 
         Payment existing = Payment.builder()
-                .orderId(77L)
+                .orderId(89L)
                 .status(PaymentStatus.SUCCESS)
-                .gateway(Gateway.RAZORPAY)
+                .paymentMethod(PaymentMethod.COD)
                 .currency("INR")
                 .createdAt(LocalDateTime.now())
                 .build();
 
         PaymentResponseDto dto = new PaymentResponseDto();
-        dto.setOrderId(77L);
+        dto.setOrderId(89L);
         dto.setPaymentStatus("SUCCESS");
+        dto.setPaymentMethod("COD");
 
-        when(paymentRepository.findAllByOrderIdOrderByCreatedAtDescIdDesc(77L)).thenReturn(List.of(existing));
+        when(paymentRepository.findAllByOrderIdOrderByCreatedAtDescIdDesc(89L)).thenReturn(List.of(existing));
         when(modelMapper.map(existing, PaymentResponseDto.class)).thenReturn(dto);
 
         paymentService.createPayment(request);
 
         ArgumentCaptor<OrderStatusUpdateEvent> eventCaptor = ArgumentCaptor.forClass(OrderStatusUpdateEvent.class);
         verify(orderStatusEventPublisher).publish(eventCaptor.capture());
-        assertEquals(String.valueOf(OrderStatus.PAID), eventCaptor.getValue().getStatus());
+        assertEquals(String.valueOf(OrderStatus.PAYMENT_DUE), eventCaptor.getValue().getStatus());
     }
 
     private String createValidRazorpaySignature(String razorpayOrderId, String razorpayPaymentId, String secret)

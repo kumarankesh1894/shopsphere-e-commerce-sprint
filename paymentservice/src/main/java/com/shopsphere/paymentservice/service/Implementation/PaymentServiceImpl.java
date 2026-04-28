@@ -179,7 +179,8 @@ public class PaymentServiceImpl implements PaymentService {
             // COD completes immediately without gateway order creation.
             payment.setStatus(PaymentStatus.SUCCESS);
             paymentRepository.save(payment);
-            safeUpdateOrderStatus(order.getId(), OrderStatus.PAID);
+            // For COD we mark the order as PAYMENT_DUE (cash will be collected on delivery).
+            safeUpdateOrderStatus(order.getId(), OrderStatus.PAYMENT_DUE);
             log.info("payment.create.cod_success orderId={} paymentId={}", order.getId(), payment.getId());
             return convertToDto(payment);
         }
@@ -292,7 +293,12 @@ public class PaymentServiceImpl implements PaymentService {
     private void syncOrderStatus(Payment payment) {
 
         if (payment.getStatus() == PaymentStatus.SUCCESS) {
-            safeUpdateOrderStatus(payment.getOrderId(), OrderStatus.PAID);
+            // COD payments are successful in the payment record, but order stays PAYMENT_DUE.
+            if (payment.getPaymentMethod() == PaymentMethod.COD) {
+                safeUpdateOrderStatus(payment.getOrderId(), OrderStatus.PAYMENT_DUE);
+            } else {
+                safeUpdateOrderStatus(payment.getOrderId(), OrderStatus.PAID);
+            }
 
         } else if (payment.getStatus() == PaymentStatus.FAILED) {
             safeUpdateOrderStatus(payment.getOrderId(), OrderStatus.PAYMENT_FAILED);
