@@ -574,6 +574,7 @@ class OrderServiceImplTest {
         paymentResponseDto.setOrderId(16L);
         paymentResponseDto.setPaymentMethod("UPI");
         paymentResponseDto.setPaymentStatus("SUCCESS");
+        paymentResponseDto.setOrderStatus("PAID");
 
         when(orderRepository.findById(16L)).thenReturn(Optional.of(order));
         when(paymentClient.createPayment(any())).thenReturn(paymentResponseDto);
@@ -617,8 +618,9 @@ class OrderServiceImplTest {
 
         orderService.deliverOrder(212L);
 
-        assertEquals(OrderStatus.PAID, order.getStatus());
+        assertEquals(OrderStatus.DELIVERED, order.getStatus());
         assertNotNull(order.getDeliveredAt());
+        verify(paymentClient).markCodPaymentPaid(212L);
         verify(orderRepository).save(order);
     }
 

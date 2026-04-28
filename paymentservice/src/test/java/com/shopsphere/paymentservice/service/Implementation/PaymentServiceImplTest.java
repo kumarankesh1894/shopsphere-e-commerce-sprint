@@ -523,6 +523,7 @@ class PaymentServiceImplTest {
         PaymentResponseDto response = paymentService.createPayment(request);
 
         assertEquals("SUCCESS", response.getPaymentStatus());
+        assertEquals("PAYMENT_DUE", response.getOrderStatus());
         assertEquals("COD", response.getPaymentMethod());
 
         ArgumentCaptor<OrderStatusUpdateEvent> eventCaptor = ArgumentCaptor.forClass(OrderStatusUpdateEvent.class);
@@ -552,11 +553,34 @@ class PaymentServiceImplTest {
         when(paymentRepository.findAllByOrderIdOrderByCreatedAtDescIdDesc(89L)).thenReturn(List.of(existing));
         when(modelMapper.map(existing, PaymentResponseDto.class)).thenReturn(dto);
 
-        paymentService.createPayment(request);
+        PaymentResponseDto response = paymentService.createPayment(request);
+
+        assertEquals("PAYMENT_DUE", response.getOrderStatus());
 
         ArgumentCaptor<OrderStatusUpdateEvent> eventCaptor = ArgumentCaptor.forClass(OrderStatusUpdateEvent.class);
         verify(orderStatusEventPublisher).publish(eventCaptor.capture());
         assertEquals(String.valueOf(OrderStatus.PAYMENT_DUE), eventCaptor.getValue().getStatus());
+    }
+
+    @Test
+    void markCodPaymentPaid_whenCodPaymentExists_marksSuccessWithCodTransaction() {
+        Payment payment = Payment.builder()
+                .id(901L)
+                .orderId(89L)
+                .status(PaymentStatus.SUCCESS)
+                .paymentMethod(PaymentMethod.COD)
+                .failureReason("previous note")
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(paymentRepository.findAllByOrderIdOrderByCreatedAtDescIdDesc(89L)).thenReturn(List.of(payment));
+
+        paymentService.markCodPaymentPaid(89L);
+
+        assertEquals(PaymentStatus.SUCCESS, payment.getStatus());
+        assertEquals("COD-89", payment.getTransactionId());
+        assertNull(payment.getFailureReason());
+        verify(paymentRepository).save(payment);
     }
 
     private String createValidRazorpaySignature(String razorpayOrderId, String razorpayPaymentId, String secret)

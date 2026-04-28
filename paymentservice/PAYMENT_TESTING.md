@@ -44,6 +44,7 @@ Authorization: Bearer <JWT_TOKEN>
 Expected response includes:
 
 - `paymentStatus: PROCESSING`
+- `orderStatus: PAYMENT_PENDING`
 - `razorpayOrderId`
 - `razorpayKeyId`
 - `amountInPaise`
@@ -102,6 +103,15 @@ Authorization: Bearer <JWT_TOKEN>
 Expected status after successful verify:
 
 - `PAID`
+
+## COD Semantics
+
+For COD, payment creation returns `paymentStatus: SUCCESS` because no gateway payment is needed to continue checkout. Clients should use `orderStatus` for the order flow:
+
+- `orderStatus: PAYMENT_DUE` after COD is selected
+- `orderStatus: DELIVERED` after admin delivers the order
+
+When admin marks a COD order delivered, Order Service calls Payment Service to mark the COD payment as collected. Payment Service stores that collected state as `PaymentStatus.SUCCESS` and records a COD transaction reference.
 
 ## 8) Common Errors and Meaning
 

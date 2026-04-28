@@ -274,6 +274,32 @@ public class PaymentServiceImpl implements PaymentService {
         }
     }
 
+    /*
+     * What:
+     * Finalizes COD collection from the admin delivery flow.
+     *
+     * Why:
+     * COD is created as SUCCESS so checkout can proceed without a gateway, but
+     * cash is only actually collected when the order is delivered.
+     */
+    @Transactional
+    @Override
+    public void markCodPaymentPaid(Long orderId) {
+        Payment payment = paymentRepository.findAllByOrderIdOrderByCreatedAtDescIdDesc(orderId).stream()
+                .findFirst()
+                .orElseThrow(() -> new PaymentException("Payment not found for order"));
+
+        if (payment.getPaymentMethod() != PaymentMethod.COD) {
+            throw new PaymentException("Only COD payments can be marked paid at delivery");
+        }
+
+        payment.setStatus(PaymentStatus.SUCCESS);
+        payment.setFailureReason(null);
+        payment.setTransactionId("COD-" + orderId);
+        paymentRepository.save(payment);
+        log.info("payment.cod_paid.success orderId={} paymentId={}", orderId, payment.getId());
+    }
+
     // =============================
     // Internal helper methods
     // =============================
@@ -324,14 +350,33 @@ public class PaymentServiceImpl implements PaymentService {
         PaymentResponseDto dto =
                 modelMapper.map(payment, PaymentResponseDto.class);
         dto.setPaymentStatus(payment.getStatus().name());
+        dto.setOrderStatus(resolveOrderStatus(payment).name());
         dto.setGateway(payment.getGateway() != null ? payment.getGateway().name() : null);
         dto.setPaymentMethod(payment.getPaymentMethod() != null ? payment.getPaymentMethod().name() : null);
         dto.setRazorpayKeyId(payment.getGateway() == Gateway.RAZORPAY ? razorpayKeyId : null);
         dto.setFailureReason(payment.getFailureReason());
         dto.setMessage(payment.getPaymentMethod() != PaymentMethod.COD
                 ? "Use razorpayOrderId and razorpayKeyId on frontend checkout."
-                : "COD selected; no gateway order created.");
+                : "COD selected; paymentStatus SUCCESS means no gateway is required. Follow orderStatus for fulfillment.");
         return dto;
+    }
+
+    /*
+     * Payment status describes payment-service completion, while orderStatus tells
+     * clients which order lifecycle state should drive UI and admin actions.
+     */
+    private OrderStatus resolveOrderStatus(Payment payment) {
+        if (payment.getStatus() == PaymentStatus.SUCCESS) {
+            return payment.getPaymentMethod() == PaymentMethod.COD
+                    ? OrderStatus.PAYMENT_DUE
+                    : OrderStatus.PAID;
+        }
+
+        if (payment.getStatus() == PaymentStatus.FAILED) {
+            return OrderStatus.PAYMENT_FAILED;
+        }
+
+        return OrderStatus.PAYMENT_PENDING;
     }
 
     /*

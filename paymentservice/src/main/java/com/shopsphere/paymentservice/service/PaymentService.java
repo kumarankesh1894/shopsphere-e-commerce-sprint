@@ -18,5 +18,5 @@ public interface PaymentService {
     // =============================
     // Admin APIs
     // =============================
-    // Currently no admin-only payment service method is implemented.
+    void markCodPaymentPaid(Long orderId);
 }

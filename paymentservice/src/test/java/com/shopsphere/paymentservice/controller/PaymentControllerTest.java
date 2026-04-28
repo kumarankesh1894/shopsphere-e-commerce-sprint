@@ -63,5 +63,13 @@ class PaymentControllerTest {
         assertEquals("SUCCESS", response.getBody().getPaymentStatus());
         verify(paymentService).verifyPayment(request);
     }
+
+    @Test
+    void markCodPaymentPaid_delegatesToService() {
+        ResponseEntity<Void> response = paymentController.markCodPaymentPaid(44L);
+
+        assertEquals(204, response.getStatusCode().value());
+        verify(paymentService).markCodPaymentPaid(44L);
+    }
 }
 

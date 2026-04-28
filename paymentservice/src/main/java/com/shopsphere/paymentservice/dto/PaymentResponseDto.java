@@ -9,6 +9,7 @@ public class PaymentResponseDto {
 
     private Long orderId;
     private String paymentStatus;
+    private String orderStatus;
     private String gateway;
     private String paymentMethod;
     private String razorpayOrderId;

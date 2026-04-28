@@ -10,6 +10,7 @@ import com.shopsphere.paymentservice.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -80,5 +81,20 @@ public class PaymentController {
     // =============================
     // Admin APIs
     // =============================
-    // Currently no admin-only payment endpoint is implemented.
+
+    /*
+     * What:
+     * Marks a COD payment as collected after admin delivers the order.
+     *
+     * Why:
+     * COD does not use a gateway callback, so delivery is the point where cash
+     * collection becomes final in the payment ledger.
+     */
+    @Operation(summary = "Mark COD payment paid", description = "Marks COD payment as collected when the order is delivered")
+    @PostMapping("/orders/{orderId}/cod/paid")
+    public ResponseEntity<Void> markCodPaymentPaid(@PathVariable Long orderId) {
+        log.info("payment.controller.cod_paid.request orderId={}", orderId);
+        paymentService.markCodPaymentPaid(orderId);
+        return ResponseEntity.noContent().build();
+    }
 }

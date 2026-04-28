@@ -3,6 +3,7 @@ package com.shopsphere.orderservice.client;
 import com.shopsphere.orderservice.dto.PaymentRequestDto;
 import com.shopsphere.orderservice.dto.PaymentResponseDto;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
@@ -21,4 +22,7 @@ public interface PaymentClient {
 
     @PostMapping("/api/payments/internal")
     PaymentResponseDto createPayment(@RequestBody PaymentRequestDto request);
+
+    @PostMapping("/api/payments/internal/orders/{orderId}/cod/paid")
+    void markCodPaymentPaid(@PathVariable("orderId") Long orderId);
 }
