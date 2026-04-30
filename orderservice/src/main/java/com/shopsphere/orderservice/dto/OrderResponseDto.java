@@ -2,6 +2,7 @@ package com.shopsphere.orderservice.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.shopsphere.orderservice.enums.OrderStatus;
+import com.shopsphere.orderservice.enums.PaymentMethod;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -36,4 +37,5 @@ public class OrderResponseDto {
 
     private List<OrderItemResponseDto> items;
     private AddressDto address;
+    private PaymentMethod paymentMethod;
 }

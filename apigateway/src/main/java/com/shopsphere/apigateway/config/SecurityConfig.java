@@ -10,10 +10,13 @@ public class SecurityConfig {
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
         return http
-                .csrf(ServerHttpSecurity.CsrfSpec::disable) // disable CSRF
+                .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                // Enable CORS — delegates to the CorsWebFilter bean in CorsConfig
+                .cors(cors -> {})
                 .authorizeExchange(exchange -> exchange
-                        .anyExchange().permitAll() // allow all
+                        .anyExchange().permitAll()
                 )
                 .build();
     }
 }
+

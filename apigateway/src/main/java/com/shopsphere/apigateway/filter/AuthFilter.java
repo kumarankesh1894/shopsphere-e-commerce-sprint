@@ -26,6 +26,11 @@ public class AuthFilter implements GlobalFilter, Ordered{
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getURI().getPath();
 
+        // Let CORS preflight requests pass through — they carry no token
+        if (request.getMethod() == org.springframework.http.HttpMethod.OPTIONS) {
+            return chain.filter(exchange);
+        }
+
         //Skip the endpoints
         if(isPublic(path) ){ // isPublic method created below where i had put all the public endpoints
             return chain.filter(exchange); //allow endpoints to pass through without token validation

@@ -599,6 +599,7 @@ public class OrderServiceImpl implements OrderService {
                 .cancelledAt(order.getCancelledAt())
                 .address(addressDto)
                 .items(items)
+                .paymentMethod(order.getPaymentMethod())
                 .build();
     }
 }
