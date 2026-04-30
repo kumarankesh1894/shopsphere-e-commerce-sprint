@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -174,15 +175,18 @@ public class AdminController {
         LocalDate resolvedEnd = end != null ? end : LocalDate.now();
         LocalDate resolvedStart = start != null ? start : resolvedEnd.minusDays(30);
 
+        // Call each service method individually — each is independently cached,
+        // so repeated calls within the TTL window hit Redis, not orderservice.
         SalesReportResponse sales = reportService.getSalesReport(resolvedStart, resolvedEnd);
         List<TopProductDto> products = reportService.getTopProducts(resolvedStart, resolvedEnd);
         List<CustomerActivityDto> customers = reportService.getTopCustomers(resolvedStart, resolvedEnd);
 
-        Map<String, Object> data = Map.of(
-                "sales", sales,
-                "products", products,
-                "customers", customers
-        );
+        Map<String, Object> data = new LinkedHashMap<>();
+        // LinkedHashMap preserves insertion order so the JSON response always
+        // delivers keys in the expected sales → products → customers sequence.
+        data.put("sales", sales);
+        data.put("products", products);
+        data.put("customers", customers);
         return ResponseEntity.ok(ApiResponse.success(data, "Reports fetched successfully"));
     }
 

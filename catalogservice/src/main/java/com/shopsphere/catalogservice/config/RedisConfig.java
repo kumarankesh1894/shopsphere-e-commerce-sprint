@@ -1,6 +1,7 @@
 package com.shopsphere.catalogservice.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
@@ -13,20 +14,25 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.netflix.spectator.impl.Config.defaultConfig;
 import static org.springframework.data.redis.cache.RedisCacheConfiguration.defaultCacheConfig;
 
 @Configuration
+@EnableCaching
 public class RedisConfig {
-    @Bean
-    public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
 
-        // JSON Serializer
-        // Create ObjectMapper instance (used for JSON conversion i.e java-> json and json->java)
-        ObjectMapper objectMapper = new ObjectMapper();
-        //preserve class type in Redis
-        objectMapper.activateDefaultTyping(
-                objectMapper.getPolymorphicTypeValidator(),
+    @Bean
+    public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory, ObjectMapper objectMapper) {
+
+        /*
+         * Copy Spring's auto-configured ObjectMapper so we keep all registered modules
+         * (JavaTimeModule for LocalDateTime, etc.) while adding type metadata for Redis.
+         * Using new ObjectMapper() directly would lose those modules and cause
+         * deserialization failures for date/time fields.
+         */
+        ObjectMapper redisObjectMapper = objectMapper.copy();
+        // preserve class type in Redis so deserialization knows the target type
+        redisObjectMapper.activateDefaultTyping(
+                redisObjectMapper.getPolymorphicTypeValidator(),
                 ObjectMapper.DefaultTyping.NON_FINAL
         );
 
@@ -41,40 +47,29 @@ public class RedisConfig {
          * - To control how JSON serialization/deserialization happens
          * - Supports custom configurations if needed (date format, etc.)
          */
-
         RedisSerializationContext.SerializationPair<Object> jsonSerializer =
                 RedisSerializationContext.SerializationPair.fromSerializer(
-                        //It serializes Java objects into JSON format for storing in Redis
-                        // and deserializes them back, making the cache readable and microservice-friendly.
-                        new GenericJackson2JsonRedisSerializer(objectMapper));
+                        new GenericJackson2JsonRedisSerializer(redisObjectMapper));
 
-        // 🔥 Default config (fallback)
+        // Default config (fallback for any cache not listed below)
         RedisCacheConfiguration defaultConfig = defaultCacheConfig()
                 .serializeValuesWith(jsonSerializer)
                 .entryTtl(Duration.ofMinutes(5));
 
         Map<String, RedisCacheConfiguration> cacheConfigs = new HashMap<>();
 
-        // Product by ID (stable)
-        cacheConfigs.put("products",defaultConfig
-                        .entryTtl(Duration.ofMinutes(10)));
+        // Product by ID — TTL aligned with productsList to prevent list/detail inconsistency
+        cacheConfigs.put("products", defaultConfig.entryTtl(Duration.ofMinutes(5)));
 
-        // Product list
-        cacheConfigs.put("productsList",
-                defaultConfig
-                        .entryTtl(Duration.ofMinutes(3)));
+        // Product list (paginated)
+        cacheConfigs.put("productsList", defaultConfig.entryTtl(Duration.ofMinutes(5)));
 
-        // Search (very dynamic)
-        cacheConfigs.put("productSearch",
-                defaultConfig
-                        .entryTtl(Duration.ofSeconds(60)));
+        // Search results — slightly shorter since filters make results more dynamic
+        cacheConfigs.put("productSearch", defaultConfig.entryTtl(Duration.ofMinutes(2)));
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)
                 .withInitialCacheConfigurations(cacheConfigs)
                 .build();
     }
-
-
-
 }

@@ -57,9 +57,15 @@ public class CartServiceImpl implements CartService {
             item.setQuantity(item.getQuantity() + request.getQuantity());
             cartItemRepository.save(item);
         } else {
+            // Use client-supplied name override (e.g. "Men T-Shirt (M)") when present,
+            // otherwise fall back to the catalog product name.
+            String displayName = (request.getProductName() != null && !request.getProductName().isBlank())
+                    ? request.getProductName()
+                    : product.getProductName();
+
             CartItem item = CartItem.builder()
                     .productId(product.getProductId())
-                    .productName(product.getProductName())
+                    .productName(displayName)
                     .price(product.getPrice())
                     .quantity(request.getQuantity())
                     .cart(cart)

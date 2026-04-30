@@ -2,6 +2,7 @@ package com.shopsphere.adminservice.client;
 
 import com.shopsphere.adminservice.dto.OrderAdminDto;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -38,8 +39,8 @@ public interface AdminOrderClient {
      */
     @GetMapping("/api/orders/internal/admin/report")
     List<OrderAdminDto> getOrdersByDateRange(
-            @RequestParam("start") LocalDate start,
-            @RequestParam("end") LocalDate end
+            @RequestParam("start") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+            @RequestParam("end") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end
     );
 
     /*

@@ -67,6 +67,10 @@ public class ProductServiceImpl implements ProductService {
         //CRITICAL FIX (just 2 lines)
         response.setStock(product.getStock());
         response.setPrice(product.getPrice());
+        // Set categoryName so frontend can detect product type (e.g. Fashion size selector)
+        if (product.getCategory() != null) {
+            response.setCategoryName(product.getCategory().getCategoryName());
+        }
 
         return response;
     }

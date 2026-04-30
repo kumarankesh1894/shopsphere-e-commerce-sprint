@@ -50,25 +50,53 @@ public class RedisConfig implements CachingConfigurer {
      */
     @Bean
     public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory, ObjectMapper objectMapper) {
+        /*
+         * Copy Spring's auto-configured ObjectMapper so we keep all registered modules
+         * (JavaTimeModule for LocalDateTime, etc.) while adding type metadata for Redis.
+         * Using new ObjectMapper() directly would lose those modules and cause
+         * deserialization failures for date/time fields stored in report DTOs.
+         */
         ObjectMapper redisObjectMapper = objectMapper.copy();
+        /*
+         * activateDefaultTyping embeds class type metadata inside the JSON payload.
+         * This allows Redis to deserialize back to the correct Java type
+         * (e.g. DashboardResponse, List<TopProductDto>) without ambiguity.
+         */
         redisObjectMapper.activateDefaultTyping(
                 redisObjectMapper.getPolymorphicTypeValidator(),
                 ObjectMapper.DefaultTyping.NON_FINAL
         );
 
+        /*
+         * Serializer used by Spring Cache for all Redis values in this service:
+         * - Java object → JSON when writing to Redis
+         * - JSON → Java object when reading from Redis
+         */
         RedisSerializationContext.SerializationPair<Object> jsonSerializer =
                 RedisSerializationContext.SerializationPair.fromSerializer(
                         new GenericJackson2JsonRedisSerializer(redisObjectMapper));
 
+        /*
+         * Default cache policy: JSON serializer + 5-minute TTL.
+         * Any cache not listed in cacheConfigs below falls back to this.
+         */
         RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
                 .serializeValuesWith(jsonSerializer)
                 .entryTtl(Duration.ofMinutes(5));
 
         Map<String, RedisCacheConfiguration> cacheConfigs = new HashMap<>();
+        // dashboard: aggregated revenue + order counts + top products
         cacheConfigs.put("dashboard", defaultConfig.entryTtl(Duration.ofMinutes(5)));
+        // sales: day-by-day revenue breakdown for a date range
         cacheConfigs.put("sales", defaultConfig.entryTtl(Duration.ofMinutes(5)));
-        cacheConfigs.put("products", defaultConfig.entryTtl(Duration.ofMinutes(5)));
+        // adminReportProducts: top products by revenue for a date range.
+        // Renamed from "products" to avoid collision with catalogservice's "products"
+        // cache which stores individual ProductResponse DTOs keyed by product ID.
+        // Both services share the same Redis instance, so names must be unique.
+        cacheConfigs.put("adminReportProducts", defaultConfig.entryTtl(Duration.ofMinutes(5)));
+        // users: customer activity summary (spend, order count) for a date range
         cacheConfigs.put("users", defaultConfig.entryTtl(Duration.ofMinutes(5)));
+        // orders: full admin order list used by the order management table
         cacheConfigs.put("orders", defaultConfig.entryTtl(Duration.ofMinutes(5)));
 
         return RedisCacheManager.builder(connectionFactory)

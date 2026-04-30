@@ -484,9 +484,9 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // Step 3: Payment can start only from CHECKOUT.
-        if (order.getStatus() != OrderStatus.CHECKOUT) {
+        if (order.getStatus() != OrderStatus.CHECKOUT && order.getStatus() != OrderStatus.PAYMENT_PENDING && order.getStatus() != OrderStatus.PAYMENT_FAILED) {
             log.warn("order.payment.blocked orderId={} currentStatus={}", orderId, order.getStatus());
-            throw new InvalidOrderStateException("Order is not in CHECKOUT state");
+            throw new InvalidOrderStateException("Order is not in CHECKOUT, PAYMENT_PENDING, or PAYMENT_FAILED state");
         }
 
         // Step 4: Call Payment Service

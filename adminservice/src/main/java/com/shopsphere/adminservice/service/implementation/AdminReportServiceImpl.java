@@ -33,7 +33,8 @@ import java.util.stream.Collectors;
  * Implements admin reporting logic.
  *
  * Why:
- * Adminservice receives raw order data and converts it into dashboard/report metrics.
+ * Adminservice receives raw order data and converts it into dashboard/report
+ * metrics.
  *
  * How:
  * - Fetch orders from orderservice through Feign.
@@ -42,280 +43,302 @@ import java.util.stream.Collectors;
  */
 public class AdminReportServiceImpl implements AdminReportService {
 
-    private final AdminOrderClient orderClient;
+        private final AdminOrderClient orderClient;
 
-    /*
-     * What:
-     * Builds dashboard response.
-     *
-     * Why:
-     * Dashboard should show key metrics quickly without recomputing every request.
-     *
-     * How:
-     * 1) Fetch all orders.
-     * 2) Calculate revenue/status counts.
-     * 3) Calculate top products.
-     * 4) Return DashboardResponse (cached).
-     */
-    @Override
-    @Cacheable(value = "dashboard", key = "'summary'")
-    public DashboardResponse getDashboard() {
-        log.info("admin.dashboard.fetch.start");
-        List<OrderAdminDto> orders = orderClient.getAllOrders();
+        /*
+         * What:
+         * Builds dashboard response.
+         *
+         * Why:
+         * Dashboard should show key metrics quickly without recomputing every request.
+         *
+         * How:
+         * 1) Fetch all orders.
+         * 2) Calculate revenue/status counts.
+         * 3) Calculate top products.
+         * 4) Return DashboardResponse (cached).
+         */
+        @Override
+        @Cacheable(value = "dashboard", key = "'summary'")
+        public DashboardResponse getDashboard() {
+                log.info("admin.dashboard.fetch.start");
+                List<OrderAdminDto> orders = orderClient.getAllOrders();
 
-        BigDecimal totalRevenue = orders.stream()
-                .filter(this::isRevenueStatus)
-                .map(OrderAdminDto::getTotalAmount)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                BigDecimal totalRevenue = orders.stream()
+                                .filter(this::isRevenueStatus)
+                                .map(OrderAdminDto::getTotalAmount)
+                                .filter(Objects::nonNull)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        Map<String, Long> statusCounts = orders.stream()
-                .filter(o -> o.getStatus() != null)
-                .collect(Collectors.groupingBy(OrderAdminDto::getStatus, Collectors.counting()));
+                Map<String, Long> statusCounts = orders.stream()
+                                .filter(o -> o.getStatus() != null)
+                                .collect(Collectors.groupingBy(OrderAdminDto::getStatus, Collectors.counting()));
 
-        List<TopProductDto> topProducts = buildTopProducts(orders, 5);
+                // Filter to revenue-only orders before aggregating top products
+                // so cancelled/pending orders do not inflate product counts.
+                List<TopProductDto> topProducts = buildTopProducts(
+                                orders.stream().filter(this::isRevenueStatus).toList(), 5);
 
-        return DashboardResponse.builder()
-                .totalRevenue(totalRevenue)
-                .totalOrders((long) orders.size())
-                .statusCounts(statusCounts)
-                .topProducts(topProducts)
-                .build();
-    }
-
-    /*
-     * What:
-     * Builds sales report for a date range.
-     *
-     * Why:
-     * Reports page needs day-wise totals and a grand total.
-     *
-     * How:
-     * 1) Fetch orders by date range.
-     * 2) Keep only revenue statuses.
-     * 3) Group by date and sum values.
-     * 4) Build SalesReportResponse (cached).
-     */
-    @Override
-    @Cacheable(value = "sales", key = "#start.toString() + '_' + #end.toString()")
-    public SalesReportResponse getSalesReport(LocalDate start, LocalDate end) {
-        log.info("admin.reports.sales.fetch start={} end={}", start, end);
-        List<OrderAdminDto> orders = orderClient.getOrdersByDateRange(start, end).stream()
-                .filter(this::isRevenueStatus)
-                .toList();
-
-        Map<LocalDate, List<OrderAdminDto>> grouped = orders.stream()
-                .filter(o -> o.getPlacedAt() != null)
-                .collect(Collectors.groupingBy(o -> o.getPlacedAt().toLocalDate()));
-
-        List<SalesDataPointDto> data = grouped.entrySet().stream()
-                .sorted(Map.Entry.comparingByKey())
-                .map(entry -> {
-                    BigDecimal dayRevenue = entry.getValue().stream()
-                            .map(OrderAdminDto::getTotalAmount)
-                            .filter(Objects::nonNull)
-                            .reduce(BigDecimal.ZERO, BigDecimal::add);
-                    return SalesDataPointDto.builder()
-                            .period(entry.getKey().toString())
-                            .orderCount((long) entry.getValue().size())
-                            .revenue(dayRevenue)
-                            .build();
-                })
-                .toList();
-
-        BigDecimal grandTotal = data.stream()
-                .map(SalesDataPointDto::getRevenue)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        return SalesReportResponse.builder()
-                .data(data)
-                .grandTotal(grandTotal)
-                .build();
-    }
-
-    /*
-     * What:
-     * Returns top products for a date range.
-     *
-     * Why:
-     * Admin needs product performance by units/revenue.
-     *
-     * How:
-     * Fetch orders by range, filter valid revenue statuses,
-     * then reuse buildTopProducts helper (cached).
-     */
-    @Override
-    @Cacheable(value = "products", key = "#start.toString() + '_' + #end.toString()")
-    public List<TopProductDto> getTopProducts(LocalDate start, LocalDate end) {
-        log.info("admin.reports.products.fetch start={} end={}", start, end);
-        List<OrderAdminDto> orders = orderClient.getOrdersByDateRange(start, end).stream()
-                .filter(this::isRevenueStatus)
-                .toList();
-        return buildTopProducts(orders, 20);
-    }
-
-    /*
-     * What:
-     * Returns customer activity summary.
-     *
-     * Why:
-     * Admin needs top customers by spend and last activity.
-     *
-     * How:
-     * 1) Fetch and filter orders.
-     * 2) Group by userId.
-     * 3) Aggregate totals and last order date.
-     * 4) Sort by total spend desc (cached).
-     */
-    @Override
-    @Cacheable(value = "users", key = "#start.toString() + '_' + #end.toString()")
-    public List<CustomerActivityDto> getTopCustomers(LocalDate start, LocalDate end) {
-        log.info("admin.reports.customers.fetch start={} end={}", start, end);
-        List<OrderAdminDto> orders = orderClient.getOrdersByDateRange(start, end).stream()
-                .filter(this::isRevenueStatus)
-                .toList();
-
-        Map<Long, List<OrderAdminDto>> grouped = orders.stream()
-                .filter(o -> o.getUserId() != null)
-                .collect(Collectors.groupingBy(OrderAdminDto::getUserId));
-
-        return grouped.entrySet().stream()
-                .map(entry -> {
-                    Long userId = entry.getKey();
-                    List<OrderAdminDto> userOrders = entry.getValue();
-
-                    BigDecimal totalSpend = userOrders.stream()
-                            .map(OrderAdminDto::getTotalAmount)
-                            .filter(Objects::nonNull)
-                            .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-                    OrderAdminDto lastOrder = userOrders.stream()
-                            .max(Comparator.comparing(OrderAdminDto::getPlacedAt, Comparator.nullsLast(Comparator.naturalOrder())))
-                            .orElse(null);
-
-                    return CustomerActivityDto.builder()
-                            .userId(userId)
-                            .customerName(lastOrder != null ? lastOrder.getUserName() : null)
-                            .totalOrders((long) userOrders.size())
-                            .totalSpend(totalSpend)
-                            .lastOrderAt(lastOrder != null ? lastOrder.getPlacedAt() : null)
-                            .build();
-                })
-                .sorted(Comparator.comparing(CustomerActivityDto::getTotalSpend, Comparator.nullsLast(Comparator.reverseOrder())))
-                .toList();
-    }
-
-    /*
-     * What:
-     * Returns complete admin order list.
-     *
-     * Why:
-     * Admin order table needs raw order records with items.
-     *
-     * How:
-     * Calls orderservice internal admin endpoint and caches result.
-     */
-    @Override
-    @Cacheable(value = "orders", key = "'all'")
-    public List<OrderAdminDto> getOrders() {
-        log.info("admin.orders.fetch.start");
-        return orderClient.getAllOrders();
-    }
-
-    /*
-     * What:
-     * Updates order status from admin side.
-     *
-     * Why:
-     * Status changes affect dashboard/reports, so cache must be invalidated.
-     *
-     * How:
-     * 1) Evict all report caches.
-     * 2) Forward update request to orderservice.
-     */
-    @Override
-    @Caching(evict = {
-            @CacheEvict(value = "dashboard", allEntries = true),
-            @CacheEvict(value = "sales", allEntries = true),
-            @CacheEvict(value = "products", allEntries = true),
-            @CacheEvict(value = "users", allEntries = true),
-            @CacheEvict(value = "orders", allEntries = true)
-    })
-    public void updateOrderStatus(Long orderId, String status) {
-        log.info("admin.orders.status_update orderId={} status={}", orderId, status);
-        orderClient.updateOrderStatus(orderId, status);
-    }
-
-    /*
-     * What:
-     * Checks whether an order status should count in revenue reports.
-     *
-     * Why:
-     * Draft/failed/cancelled states should not inflate revenue numbers.
-     *
-     * How:
-     * Return true only for PAID, SHIPPED, DELIVERED.
-     */
-    private boolean isRevenueStatus(OrderAdminDto order) {
-        if (order.getStatus() == null) {
-            return false;
+                return DashboardResponse.builder()
+                                .totalRevenue(totalRevenue)
+                                .totalOrders((long) orders.size())
+                                .statusCounts(statusCounts)
+                                .topProducts(topProducts)
+                                .build();
         }
-        return "PAID".equals(order.getStatus()) || "SHIPPED".equals(order.getStatus()) || "DELIVERED".equals(order.getStatus());
-    }
 
-    /*
-     * What:
-     * Aggregates product-level sales from order items.
-     *
-     * Why:
-     * Both dashboard and reports need top products by revenue.
-     *
-     * How:
-     * 1) Iterate each order item.
-     * 2) Accumulate units and revenue per product id.
-     * 3) Convert to TopProductDto list, sort by revenue desc, apply limit.
-     */
-    private List<TopProductDto> buildTopProducts(List<OrderAdminDto> orders, int limit) {
-        Map<Long, TopProductAccumulator> agg = new HashMap<>();
+        /*
+         * What:
+         * Builds sales report for a date range.
+         *
+         * Why:
+         * Reports page needs day-wise totals and a grand total.
+         *
+         * How:
+         * 1) Fetch orders by date range.
+         * 2) Keep only revenue statuses.
+         * 3) Group by date and sum values.
+         * 4) Build SalesReportResponse (cached).
+         */
+        @Override
+        @Cacheable(value = "sales", key = "#start.toString() + '_' + #end.toString()")
+        public SalesReportResponse getSalesReport(LocalDate start, LocalDate end) {
+                log.info("admin.reports.sales.fetch start={} end={}", start, end);
+                List<OrderAdminDto> orders = orderClient.getOrdersByDateRange(start, end);
 
-        for (OrderAdminDto order : orders) {
-            if (order.getItems() == null) {
-                continue;
-            }
-            for (OrderAdminItemDto item : order.getItems()) {
-                if (item.getProductId() == null) {
-                    continue;
+                Map<LocalDate, List<OrderAdminDto>> grouped = orders.stream()
+                                // Only count orders that represent confirmed revenue.
+                                // CHECKOUT, PAYMENT_PENDING, PAYMENT_FAILED, and CANCELLED
+                                // must not appear in sales figures.
+                                .filter(this::isRevenueStatus)
+                                .filter(o -> o.getPlacedAt() != null)
+                                .collect(Collectors.groupingBy(o -> o.getPlacedAt().toLocalDate()));
+
+                List<SalesDataPointDto> data = grouped.entrySet().stream()
+                                .sorted(Map.Entry.comparingByKey())
+                                .map(entry -> {
+                                        BigDecimal dayRevenue = entry.getValue().stream()
+                                                        .map(OrderAdminDto::getTotalAmount)
+                                                        .filter(Objects::nonNull)
+                                                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                                        return SalesDataPointDto.builder()
+                                                        .period(entry.getKey().toString())
+                                                        .orderCount((long) entry.getValue().size())
+                                                        .revenue(dayRevenue)
+                                                        .build();
+                                })
+                                .toList();
+
+                BigDecimal grandTotal = data.stream()
+                                .map(SalesDataPointDto::getRevenue)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                return SalesReportResponse.builder()
+                                .data(data)
+                                .grandTotal(grandTotal)
+                                .build();
+        }
+
+        /*
+         * What:
+         * Returns top products for a date range.
+         *
+         * Why:
+         * Admin needs product performance by units/revenue.
+         *
+         * How:
+         * Fetch orders by range, filter valid revenue statuses,
+         * then reuse buildTopProducts helper.
+         * Cached under "adminReportProducts" (not "products") to avoid collision
+         * with catalogservice's product-by-ID cache on the shared Redis instance.
+         */
+        @Override
+        @Cacheable(value = "adminReportProducts", key = "#start.toString() + '_' + #end.toString()")
+        public List<TopProductDto> getTopProducts(LocalDate start, LocalDate end) {
+                log.info("admin.reports.products.fetch start={} end={}", start, end);
+                // Filter to revenue-only orders before aggregating so that
+                // cancelled and pending orders do not inflate product unit counts.
+                List<OrderAdminDto> orders = orderClient.getOrdersByDateRange(start, end).stream()
+                                .filter(this::isRevenueStatus)
+                                .toList();
+                return buildTopProducts(orders, 20);
+        }
+
+        /*
+         * What:
+         * Returns customer activity summary.
+         *
+         * Why:
+         * Admin needs top customers by spend and last activity.
+         *
+         * How:
+         * 1) Fetch and filter orders.
+         * 2) Group by userId.
+         * 3) Aggregate totals and last order date.
+         * 4) Sort by total spend desc (cached).
+         */
+        @Override
+        @Cacheable(value = "users", key = "#start.toString() + '_' + #end.toString()")
+        public List<CustomerActivityDto> getTopCustomers(LocalDate start, LocalDate end) {
+                log.info("admin.reports.customers.fetch start={} end={}", start, end);
+                List<OrderAdminDto> orders = orderClient.getOrdersByDateRange(start, end);
+
+                Map<Long, List<OrderAdminDto>> grouped = orders.stream()
+                                // Exclude non-revenue statuses so abandoned checkouts and
+                                // cancelled orders do not create ghost customer entries.
+                                .filter(this::isRevenueStatus)
+                                .filter(o -> o.getUserId() != null)
+                                .collect(Collectors.groupingBy(OrderAdminDto::getUserId));
+
+                return grouped.entrySet().stream()
+                                .map(entry -> {
+                                        Long userId = entry.getKey();
+                                        List<OrderAdminDto> userOrders = entry.getValue();
+
+                                        BigDecimal totalSpend = userOrders.stream()
+                                                        .map(OrderAdminDto::getTotalAmount)
+                                                        .filter(Objects::nonNull)
+                                                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                                        OrderAdminDto lastOrder = userOrders.stream()
+                                                        .max(Comparator.comparing(OrderAdminDto::getPlacedAt,
+                                                                        Comparator.nullsLast(
+                                                                                        Comparator.naturalOrder())))
+                                                        .orElse(null);
+
+                                        return CustomerActivityDto.builder()
+                                                        .userId(userId)
+                                                        .customerName(lastOrder != null ? lastOrder.getUserName()
+                                                                        : null)
+                                                        .totalOrders((long) userOrders.size())
+                                                        .totalSpend(totalSpend)
+                                                        .lastOrderAt(lastOrder != null ? lastOrder.getPlacedAt() : null)
+                                                        .build();
+                                })
+                                .sorted(Comparator.comparing(CustomerActivityDto::getTotalSpend,
+                                                Comparator.nullsLast(Comparator.reverseOrder())))
+                                .toList();
+        }
+
+        /*
+         * What:
+         * Returns complete admin order list.
+         *
+         * Why:
+         * Admin order table needs raw order records with items.
+         *
+         * How:
+         * Calls orderservice internal admin endpoint and caches result.
+         */
+        @Override
+        @Cacheable(value = "orders", key = "'all'")
+        public List<OrderAdminDto> getOrders() {
+                log.info("admin.orders.fetch.start");
+                return orderClient.getAllOrders();
+        }
+
+        /*
+         * What:
+         * Updates order status from admin side.
+         *
+         * Why:
+         * Status changes affect dashboard/reports, so cache must be invalidated.
+         *
+         * How:
+         * 1) Evict all report caches.
+         * 2) Forward update request to orderservice.
+         */
+        @Override
+        @Caching(evict = {
+                        @CacheEvict(value = "dashboard", allEntries = true),
+                        @CacheEvict(value = "sales", allEntries = true),
+                        // "adminReportProducts" was renamed from "products" to avoid
+                        // collision with catalogservice's product-by-ID cache.
+                        @CacheEvict(value = "adminReportProducts", allEntries = true),
+                        @CacheEvict(value = "users", allEntries = true),
+                        @CacheEvict(value = "orders", allEntries = true)
+        })
+        public void updateOrderStatus(Long orderId, String status) {
+                log.info("admin.orders.status_update orderId={} status={}", orderId, status);
+                orderClient.updateOrderStatus(orderId, status);
+        }
+
+        /*
+         * What:
+         * Checks whether an order status should count in revenue reports.
+         *
+         * Why:
+         * Draft/failed/cancelled states should not inflate revenue numbers.
+         *
+         * How:
+         * Return true for PAID, PACKED, SHIPPED, DELIVERED, and PAYMENT_DUE.
+         * PACKED is included because it follows a confirmed payment.
+         * PAYMENT_DUE covers COD orders that are placed and awaiting cash collection.
+         */
+        private boolean isRevenueStatus(OrderAdminDto order) {
+                if (order.getStatus() == null) {
+                        return false;
                 }
-                TopProductAccumulator current = agg.computeIfAbsent(item.getProductId(), k -> new TopProductAccumulator());
-                current.productName = item.getProductName();
-                current.unitsSold += item.getQuantity() == null ? 0 : item.getQuantity();
-                BigDecimal lineRevenue = (item.getPrice() == null || item.getQuantity() == null)
-                        ? BigDecimal.ZERO
-                        : item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
-                current.revenue = current.revenue.add(lineRevenue);
-            }
+                return "PAID".equals(order.getStatus()) || "PACKED".equals(order.getStatus())
+                                || "SHIPPED".equals(order.getStatus())
+                                || "DELIVERED".equals(order.getStatus())
+                                || "PAYMENT_DUE".equals(order.getStatus());
         }
 
-        return agg.entrySet().stream()
-                .map(entry -> TopProductDto.builder()
-                        .productId(entry.getKey())
-                        .productName(entry.getValue().productName)
-                        .unitsSold(entry.getValue().unitsSold)
-                        .revenue(entry.getValue().revenue)
-                        .build())
-                .sorted(Comparator.comparing(TopProductDto::getRevenue, Comparator.nullsLast(Comparator.reverseOrder())))
-                .limit(limit)
-                .toList();
-    }
+        /*
+         * What:
+         * Aggregates product-level sales from order items.
+         *
+         * Why:
+         * Both dashboard and reports need top products by revenue.
+         *
+         * How:
+         * 1) Iterate each order item.
+         * 2) Accumulate units and revenue per product id.
+         * 3) Convert to TopProductDto list, sort by revenue desc, apply limit.
+         */
+        private List<TopProductDto> buildTopProducts(List<OrderAdminDto> orders, int limit) {
+                Map<Long, TopProductAccumulator> agg = new HashMap<>();
 
-    /*
-     * Small mutable helper used during aggregation.
-     * It keeps running totals before final DTO conversion.
-     */
-    private static class TopProductAccumulator {
-        private String productName;
-        private long unitsSold;
-        private BigDecimal revenue = BigDecimal.ZERO;
-    }
+                for (OrderAdminDto order : orders) {
+                        if (order.getItems() == null) {
+                                continue;
+                        }
+                        for (OrderAdminItemDto item : order.getItems()) {
+                                if (item.getProductId() == null) {
+                                        continue;
+                                }
+                                TopProductAccumulator current = agg.computeIfAbsent(item.getProductId(),
+                                                k -> new TopProductAccumulator());
+                                current.productName = item.getProductName();
+                                current.unitsSold += item.getQuantity() == null ? 0 : item.getQuantity();
+                                BigDecimal lineRevenue = (item.getPrice() == null || item.getQuantity() == null)
+                                                ? BigDecimal.ZERO
+                                                : item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
+                                current.revenue = current.revenue.add(lineRevenue);
+                        }
+                }
+
+                return agg.entrySet().stream()
+                                .map(entry -> TopProductDto.builder()
+                                                .productId(entry.getKey())
+                                                .productName(entry.getValue().productName)
+                                                .unitsSold(entry.getValue().unitsSold)
+                                                .revenue(entry.getValue().revenue)
+                                                .build())
+                                .sorted(Comparator.comparing(TopProductDto::getRevenue,
+                                                Comparator.nullsLast(Comparator.reverseOrder())))
+                                .limit(limit)
+                                .toList();
+        }
+
+        /*
+         * Small mutable helper used during aggregation.
+         * It keeps running totals before final DTO conversion.
+         */
+        private static class TopProductAccumulator {
+                private String productName;
+                private long unitsSold;
+                private BigDecimal revenue = BigDecimal.ZERO;
+        }
 }
-

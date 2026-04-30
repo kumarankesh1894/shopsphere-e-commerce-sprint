@@ -43,7 +43,9 @@ public class AdminCatalogServiceImpl implements AdminCatalogService {
     @Caching(evict = {
             @CacheEvict(value = "dashboard", allEntries = true),
             @CacheEvict(value = "sales", allEntries = true),
-            @CacheEvict(value = "products", allEntries = true),
+            // "adminReportProducts" was renamed from "products" to avoid collision
+            // with catalogservice's product-by-ID cache on the shared Redis instance.
+            @CacheEvict(value = "adminReportProducts", allEntries = true),
             @CacheEvict(value = "users", allEntries = true),
             @CacheEvict(value = "orders", allEntries = true)
     })
@@ -66,7 +68,9 @@ public class AdminCatalogServiceImpl implements AdminCatalogService {
     @Caching(evict = {
             @CacheEvict(value = "dashboard", allEntries = true),
             @CacheEvict(value = "sales", allEntries = true),
-            @CacheEvict(value = "products", allEntries = true),
+            // "adminReportProducts" was renamed from "products" to avoid collision
+            // with catalogservice's product-by-ID cache on the shared Redis instance.
+            @CacheEvict(value = "adminReportProducts", allEntries = true),
             @CacheEvict(value = "users", allEntries = true),
             @CacheEvict(value = "orders", allEntries = true)
     })
@@ -89,7 +93,9 @@ public class AdminCatalogServiceImpl implements AdminCatalogService {
     @Caching(evict = {
             @CacheEvict(value = "dashboard", allEntries = true),
             @CacheEvict(value = "sales", allEntries = true),
-            @CacheEvict(value = "products", allEntries = true),
+            // "adminReportProducts" was renamed from "products" to avoid collision
+            // with catalogservice's product-by-ID cache on the shared Redis instance.
+            @CacheEvict(value = "adminReportProducts", allEntries = true),
             @CacheEvict(value = "users", allEntries = true),
             @CacheEvict(value = "orders", allEntries = true)
     })

@@ -84,6 +84,10 @@ public class RedisConfig implements CachingConfigurer {
          */
         cacheConfigs.put("orderByUser", defaultConfig.entryTtl(Duration.ofMinutes(5)));
         cacheConfigs.put("orderHistory", defaultConfig.entryTtl(Duration.ofMinutes(2)));
+        // orderInternal is used by @CacheEvict on internal status-update paths.
+        // Registering it here ensures it gets the JSON serializer and a defined TTL
+        // instead of falling back to an implicit cache with no configuration.
+        cacheConfigs.put("orderInternal", defaultConfig.entryTtl(Duration.ofMinutes(5)));
 
         /*
          * Build RedisCacheManager with:

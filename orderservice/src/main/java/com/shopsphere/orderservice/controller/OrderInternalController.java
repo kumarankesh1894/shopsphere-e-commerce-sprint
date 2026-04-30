@@ -8,6 +8,7 @@ import com.shopsphere.orderservice.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -139,8 +140,8 @@ public class OrderInternalController {
      * Reads start/end query params and delegates to orderService.getOrdersByDateRange(...).
      */
     public ResponseEntity<List<OrderAdminDto>> getOrdersByDateRange(
-            @RequestParam("start") LocalDate start,
-            @RequestParam("end") LocalDate end) {
+            @RequestParam("start") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+            @RequestParam("end") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end) {
         return ResponseEntity.ok(orderService.getOrdersByDateRange(start, end));
     }
 
