@@ -22,6 +22,11 @@ import java.util.List;
  * CorsWebFilter is the reactive (WebFlux) equivalent of Spring MVC's
  * CorsFilter. It runs before the AuthFilter so preflight OPTIONS requests
  * are answered immediately without hitting JWT validation.
+ * (Jab frontend (React) backend ko request bhejne wala hota hai,
+ * toh kabhi-kabhi browser pehle ek test request bhejta hai.Is test request ko bolte hain: OPTIONS request (Preflight request))
+ * Kyun bhejta hai OPTIONS request?
+ * Browser check karta hai:
+ *"Kya ye server mujhe allow karega ya block karega?"
  */
 @Configuration
 public class CorsConfig {
@@ -51,9 +56,11 @@ public class CorsConfig {
         // Cache preflight response for 1 hour (reduces OPTIONS round-trips)
         config.setMaxAge(3600L);
 
+        //use for mapping CORS config to URL patterns(Map (kahan rule apply hoga))
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
+        source.registerCorsConfiguration("/**", config); // Har endpoint pe ye CORS rules apply karo
 
         return new CorsWebFilter(source);
+        //(Ab filter ko: rules mil gaye, routes mapping mil gayi, Ab wo kaam kar sakta hai)
     }
 }
