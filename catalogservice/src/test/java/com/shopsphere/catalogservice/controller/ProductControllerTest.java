@@ -37,6 +37,7 @@ class ProductControllerTest {
                 new BigDecimal("79999.00"),
                 20,
                 1L,
+                "Electronics",
                 true
         );
 
@@ -47,6 +48,7 @@ class ProductControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertEquals("Product fetched successfully", response.getBody().getMessage());
         assertEquals("Samsung Galaxy S24", response.getBody().getData().getProductName());
+        assertEquals("Electronics", response.getBody().getData().getCategoryName());
     }
 
     @Test
@@ -67,6 +69,7 @@ class ProductControllerTest {
                 new BigDecimal("999.00"),
                 35,
                 1L,
+                "Electronics",
                 true
         );
 
@@ -76,7 +79,8 @@ class ProductControllerTest {
 
         assertEquals(201, response.getStatusCode().value());
         assertEquals(12L, response.getBody().getData().getProductId());
+        assertEquals("Electronics", response.getBody().getData().getCategoryName());
+
         verify(productService).createProduct(request);
     }
 }
-

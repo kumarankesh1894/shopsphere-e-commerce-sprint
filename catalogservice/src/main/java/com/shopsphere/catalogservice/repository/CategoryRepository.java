@@ -9,6 +9,6 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
 
 	boolean existsByCategoryNameIgnoreCase(String categoryName);
 
+	//optional is use to handle the nullpointer exception if category is not found.
 	Optional<Category> findByCategoryNameIgnoreCase(String categoryName);
-
 }

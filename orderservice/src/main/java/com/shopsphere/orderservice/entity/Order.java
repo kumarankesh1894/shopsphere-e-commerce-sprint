@@ -47,7 +47,7 @@ public class Order {
 
     private LocalDateTime cancelledAt;
 
-    // 🔥 Address snapshot
+    //  Address snapshot
     @Embedded
     private Address deliveryAddress;
 

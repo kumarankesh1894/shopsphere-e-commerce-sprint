@@ -465,7 +465,7 @@ public class PaymentServiceImpl implements PaymentService {
      * Payment record should still be persisted even if order-service sync is temporarily unavailable.
      *
      * How:
-     * 1) Calls orderClient.updateOrderStatus(...).
+     * 1) Calls OrderStatusUpdateEvent.updateOrderStatus(...).
      * 2) Catches and logs exceptions without rethrowing.
      */
     private void safeUpdateOrderStatus(Long orderId, OrderStatus status) {

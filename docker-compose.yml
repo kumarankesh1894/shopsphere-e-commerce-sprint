@@ -8,17 +8,32 @@ services:
       - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   rabbitmq:
     image: rabbitmq:3-management
     ports:
       - "5672:5672"
       - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   zipkin:
     image: openzipkin/zipkin:latest
@@ -32,11 +47,17 @@ services:
     ports:
       - "8888:8888"
     environment:
+      SPRING_APPLICATION_NAME: configserver
       SPRING_PROFILES_ACTIVE: dev
-      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      SERVER_PORT: 8888
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     depends_on:
       - zipkin
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8888/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
 
   eurekaserver:
     build:
@@ -45,16 +66,24 @@ services:
     ports:
       - "8761:8761"
     environment:
+      SPRING_APPLICATION_NAME: eurekaserver
       SPRING_PROFILES_ACTIVE: dev
+      CONFIG_SERVER_URL: http://configserver:8888
+      SPRING_CONFIG_IMPORT: optional:configserver:http://configserver:8888
       SERVER_PORT: 8761
       EUREKA_CLIENT_REGISTER_WITH_EUREKA: false
       EUREKA_CLIENT_FETCH_REGISTRY: false
-      CONFIG_SERVER_URL: http://configserver:8888
-      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     depends_on:
-      - configserver
-      - zipkin
+      configserver:
+        condition: service_healthy
+      zipkin:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
 
   apigateway:
     build:
@@ -63,16 +92,21 @@ services:
     ports:
       - "8080:8080"
     environment:
+      SPRING_APPLICATION_NAME: api-gateway
       SPRING_PROFILES_ACTIVE: dev
       CONFIG_SERVER_URL: http://configserver:8888
+      SPRING_CONFIG_IMPORT: optional:configserver:http://configserver:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eurekaserver:8761/eureka
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eurekaserver:8761/eureka
-      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+      JWT_SECRET: pbIe6IBR1Ed3hkGsrHQ3B7VkngAbzTuc5zVhdz9rEsg
+      JWT_EXPIRATION: 86400000
     depends_on:
-      - configserver
-      - eurekaserver
-      - zipkin
+      configserver:
+        condition: service_healthy
+      eurekaserver:
+        condition: service_healthy
+      zipkin:
+        condition: service_started
 
   authservice:
     build:
@@ -81,22 +115,29 @@ services:
     ports:
       - "8081:8081"
     environment:
+      SPRING_APPLICATION_NAME: authservice
       SPRING_PROFILES_ACTIVE: dev
       CONFIG_SERVER_URL: http://configserver:8888
+      SPRING_CONFIG_IMPORT: optional:configserver:http://configserver:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eurekaserver:8761/eureka
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eurekaserver:8761/eureka
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/user_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
-      SPRING_REDIS_HOST: redis
-      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      SPRING_DATA_REDIS_HOST: redis
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+      JWT_SECRET: pbIe6IBR1Ed3hkGsrHQ3B7VkngAbzTuc5zVhdz9rEsg
+      JWT_EXPIRATION: 86400000
     depends_on:
-      - configserver
-      - eurekaserver
-      - mysql
-      - redis
-      - zipkin
+      configserver:
+        condition: service_healthy
+      eurekaserver:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      zipkin:
+        condition: service_started
 
   catalogservice:
     build:
@@ -105,22 +146,27 @@ services:
     ports:
       - "8082:8082"
     environment:
+      SPRING_APPLICATION_NAME: catalogservice
       SPRING_PROFILES_ACTIVE: dev
       CONFIG_SERVER_URL: http://configserver:8888
+      SPRING_CONFIG_IMPORT: optional:configserver:http://configserver:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eurekaserver:8761/eureka
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eurekaserver:8761/eureka
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/catalogdb?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
-      SPRING_REDIS_HOST: redis
-      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      SPRING_DATA_REDIS_HOST: redis
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     depends_on:
-      - configserver
-      - eurekaserver
-      - mysql
-      - redis
-      - zipkin
+      configserver:
+        condition: service_healthy
+      eurekaserver:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      zipkin:
+        condition: service_started
 
   orderservice:
     build:
@@ -129,24 +175,33 @@ services:
     ports:
       - "8083:8083"
     environment:
+      SPRING_APPLICATION_NAME: orderservice
       SPRING_PROFILES_ACTIVE: dev
       CONFIG_SERVER_URL: http://configserver:8888
+      SPRING_CONFIG_IMPORT: optional:configserver:http://configserver:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eurekaserver:8761/eureka
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eurekaserver:8761/eureka
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/orderdb?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
-      SPRING_REDIS_HOST: redis
+      SPRING_DATA_REDIS_HOST: redis
       SPRING_RABBITMQ_HOST: rabbitmq
-      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: guest
+      SPRING_RABBITMQ_PASSWORD: guest
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     depends_on:
-      - configserver
-      - eurekaserver
-      - mysql
-      - redis
-      - rabbitmq
-      - zipkin
+      configserver:
+        condition: service_healthy
+      eurekaserver:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      zipkin:
+        condition: service_started
 
   paymentservice:
     build:
@@ -155,22 +210,32 @@ services:
     ports:
       - "8084:8084"
     environment:
+      SPRING_APPLICATION_NAME: paymentservice
       SPRING_PROFILES_ACTIVE: dev
       CONFIG_SERVER_URL: http://configserver:8888
+      SPRING_CONFIG_IMPORT: optional:configserver:http://configserver:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eurekaserver:8761/eureka
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eurekaserver:8761/eureka
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/paymentdb?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
       SPRING_RABBITMQ_HOST: rabbitmq
-      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: guest
+      SPRING_RABBITMQ_PASSWORD: guest
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+      RAZORPAY_KEY_ID: rzp_test_SjD984jKc0F73X
+      RAZORPAY_KEY_SECRET: RjuKcNFQFjWHMNgeFXJ97BJT
     depends_on:
-      - configserver
-      - eurekaserver
-      - mysql
-      - rabbitmq
-      - zipkin
+      configserver:
+        condition: service_healthy
+      eurekaserver:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      zipkin:
+        condition: service_started
 
   adminservice:
     build:
@@ -179,22 +244,27 @@ services:
     ports:
       - "8085:8085"
     environment:
+      SPRING_APPLICATION_NAME: adminservice
       SPRING_PROFILES_ACTIVE: dev
       CONFIG_SERVER_URL: http://configserver:8888
+      SPRING_CONFIG_IMPORT: optional:configserver:http://configserver:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eurekaserver:8761/eureka
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eurekaserver:8761/eureka
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/admindb?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
-      SPRING_REDIS_HOST: redis
-      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      SPRING_DATA_REDIS_HOST: redis
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     depends_on:
-      - configserver
-      - eurekaserver
-      - mysql
-      - redis
-      - zipkin
+      configserver:
+        condition: service_healthy
+      eurekaserver:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      zipkin:
+        condition: service_started
 
 volumes:
   mysql_data:

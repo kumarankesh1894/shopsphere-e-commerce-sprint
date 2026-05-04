@@ -311,6 +311,10 @@ public class ProductServiceImpl implements ProductService {
         log.info("Stock reduced successfully for productId: {}", productId);
     }
 
+
+    //helper method to apply fields from ProductRequest to Product entity,
+    // used in both create and update operations to avoid code duplication
+    // and ensure consistent mapping of fields.
     private void applyProductRequest(ProductRequest source, Product target) {
         target.setProductName(source.getProductName());
         target.setProductDescription(source.getProductDescription());

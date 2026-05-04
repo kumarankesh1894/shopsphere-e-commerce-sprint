@@ -26,7 +26,7 @@ public class CartServiceImpl implements CartService {
     @Override
     public CartResponseDto addToCart(Long userId, CartItemRequestDto request) {
 
-        // 🔥 1. Fetch product from Catalog Service
+        // 1. Fetch product from Catalog Service
         ApiResponse<ProductResponseDto> response = catalogClient.getProductById(request.getProductId());
         
         if (response == null || !response.isSuccess() || response.getData() == null) {
@@ -39,7 +39,7 @@ public class CartServiceImpl implements CartService {
             throw new RuntimeException("Product out of stock");
         }
 
-        // 🔥 2. Find or create cart
+        // 2. Find or create cart
         Cart cart = cartRepository.findByUserId(userId)
                 .orElseGet(() -> {
                     Cart newCart = Cart.builder()
@@ -48,7 +48,7 @@ public class CartServiceImpl implements CartService {
                     return cartRepository.save(newCart);
                 });
 
-        // 🔥 3. Check if product already exists
+        // 3. Check if product already exists
         Optional<CartItem> existingItem =
                 cartItemRepository.findByCartIdAndProductId(cart.getId(), request.getProductId());
 
@@ -74,10 +74,10 @@ public class CartServiceImpl implements CartService {
             cartItemRepository.save(item);
         }
 
-        // 🔥 Reload cart to populate items from database
+        // Reload cart to populate items from database
         cart = cartRepository.findById(cart.getId()).orElseThrow(() -> new RuntimeException("Cart not found"));
 
-        // 🔥 4. Return updated cart
+        // 4. Return updated cart
         return mapToCartResponse(cart);
     }
 
@@ -106,7 +106,7 @@ public class CartServiceImpl implements CartService {
                 .findByCartIdAndProductId(cart.getId(), productId)
                 .orElseThrow(() -> new RuntimeException("Item not found in cart"));
 
-        // 🔥 ADD THIS BLOCK HERE
+        // ADD THIS BLOCK HERE
         ApiResponse<ProductResponseDto> response =
                 catalogClient.getProductById(productId);
 
@@ -120,7 +120,7 @@ public class CartServiceImpl implements CartService {
             throw new RuntimeException("Not enough stock");
         }
 
-        // 🔥 THEN update
+        // THEN update
         item.setQuantity(quantity);
         cartItemRepository.save(item);
 
